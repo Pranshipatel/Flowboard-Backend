@@ -1,0 +1,30 @@
+/.metadata/
+# 🔹 Maven
+/target/
+!.mvn/wrapper/maven-wrapper.jar
+
+# 🔹 Eclipse / STS
+.metadata/
+.project
+.classpath
+.settings/
+.springBeans
+.sts4-cache/
+
+# 🔹 VS Code (if opened once)
+.vscode/
+
+# 🔹 OS files
+.DS_Store
+Thumbs.db
+
+# 🔹 Logs
+*.log
+
+# 🔹 Build artifacts
+*.jar
+*.war
+*.ear
+
+# 🔹 Env files
+.env
