@@ -13,6 +13,8 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 
+import com.flowboard.auth.controller.GoogleOAuthSuccessHandler;
+
 
 
 @Configuration
@@ -25,18 +27,28 @@ public class SecurityConfig {
     }
 
     @Bean
-    public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
+    public SecurityFilterChain filterChain(HttpSecurity http,
+                                          GoogleOAuthSuccessHandler successHandler) throws Exception {
 
         http
             .csrf(AbstractHttpConfigurer::disable)
             .authorizeHttpRequests(req -> req
-            	.requestMatchers("/api/auth/**", "/error").permitAll() // 🔥 allow ALL auth APIs
+                .requestMatchers(
+                    "/api/auth/**",
+                    "/oauth2/**",
+                    "/login/**",
+                    "/error",
+                    "/favicon.ico"
+                ).permitAll()
                 .anyRequest().authenticated()
             )
-            .httpBasic(httpBasic -> httpBasic.disable()); // 🔥 disable basic auth
+            // ✅ THIS IS REQUIRED
+            .oauth2Login(oauth -> oauth.successHandler(successHandler))
+            .httpBasic(AbstractHttpConfigurer::disable);
 
         return http.build();
     }
+
 
     @Bean
     public AuthenticationManager authenticationManager(AuthenticationConfiguration configuration) throws Exception {
