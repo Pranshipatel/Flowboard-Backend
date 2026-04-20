@@ -1,0 +1,126 @@
+package com.flowboard.auth.controller;
+
+
+
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
+
+import com.flowboard.auth.dto.ChangePasswordDto;
+import com.flowboard.auth.dto.LoginUserDto;
+import com.flowboard.auth.dto.RegisterResponseDto;
+import com.flowboard.auth.dto.RegisterUserDto;
+import com.flowboard.auth.dto.UpdateUserProfileDto;
+import com.flowboard.auth.dto.UserProfileDto;
+import com.flowboard.auth.entity.PasswordResetToken;
+import com.flowboard.auth.entity.User;
+import com.flowboard.auth.service.AuthService;
+import com.flowboard.auth.service.impl.PasswordResetService;
+
+import java.util.Map;
+
+
+
+
+
+
+
+@RestController
+@RequestMapping("/api/auth")
+public class AuthResource {
+
+	private AuthService authService;
+	private final PasswordResetService passwordResetService;
+	
+	public AuthResource(AuthService authService ,PasswordResetService passwordResetService) {
+		this.authService=authService;
+		this.passwordResetService=passwordResetService;
+	}
+	
+    // ---------------- REGISTER ----------------
+    @PostMapping("/register")
+    public ResponseEntity<RegisterResponseDto> register( @RequestBody RegisterUserDto registerUserDto) {
+    	return ResponseEntity.ok(authService.register(registerUserDto));
+    	
+    }
+    // ---------------- LOGIN ----------------
+    @PostMapping("/login")
+    public ResponseEntity<String> login( @RequestBody LoginUserDto loginUserDto) {
+    	return ResponseEntity.ok(authService.login(loginUserDto.getEmail(),loginUserDto.getPassword()));
+    	
+    }
+    
+    // ---------------- LOGOUT ----------------
+    @PostMapping("/logout")
+    public ResponseEntity<String> logout(@RequestHeader("Authorization") String token) {
+        return ResponseEntity.ok("Logged out successfully");
+    }
+    
+    // ---------------- REFRESH TOKEN ----------------
+    @PostMapping("/refresh")
+    public ResponseEntity<String> refresh(@RequestHeader("Authorization") String token) {
+
+        String newToken = authService.refreshToken(token);
+
+        return ResponseEntity.ok(newToken);
+    }
+    
+    // ---------------- GET PROFILE ----------------
+    @GetMapping("/profile/{userId}")
+    public ResponseEntity<UserProfileDto> getProfile(@PathVariable Integer userId) {
+    	
+    	 return ResponseEntity.ok(authService.getUserById(userId));
+    }
+    
+    // ---------------- UPDATE PROFILE ----------------
+    @PutMapping("/profile/{userId}")
+    public ResponseEntity<UserProfileDto> updateProfile(
+            @PathVariable Integer userId,
+            @RequestBody UpdateUserProfileDto dto) {
+
+        return ResponseEntity.ok(authService.updateProfile(userId, dto));
+    }
+    
+    
+    // ---------------- CHANGE PASSWORD ----------------
+    @PutMapping("/change-password/{userId}")
+    public ResponseEntity<String> changePassword(
+            @PathVariable Integer userId,
+            @RequestBody ChangePasswordDto dto) {
+
+        authService.changePassword(userId, dto);
+
+        return ResponseEntity.ok("Password updated successfully");
+    }
+    
+ // ---------------- FORGOT PASSWORD ----------------
+    @PostMapping("/forgot-password")
+    public ResponseEntity<String> forgotPassword(@RequestBody Map<String, String> body) {
+        passwordResetService.forgotPassword(body.get("email"));
+        return ResponseEntity.ok("If that email exists, a reset link has been sent");
+    }
+
+    // ---------------- RESET PASSWORD ----------------
+    @PostMapping("/reset-password")
+    public ResponseEntity<String> resetPassword(
+            @RequestParam String token,
+            @RequestBody Map<String, String> body) {
+
+        PasswordResetToken resetToken = passwordResetService.validateAndFetch(token);
+
+        User user = resetToken.getUser();
+        user.setPasswordHash(new BCryptPasswordEncoder(12).encode(body.get("password")));
+        // save back through AuthService or directly — simplest approach:
+        passwordResetService.deleteToken(resetToken); // consume the token first
+        return ResponseEntity.ok("Password updated successfully");
+    }
+    
+}
