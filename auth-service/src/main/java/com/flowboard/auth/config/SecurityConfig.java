@@ -42,7 +42,7 @@ public class SecurityConfig {
                 ).permitAll()
                 .anyRequest().authenticated()
             )
-            // ✅ THIS IS REQUIRED
+            
             .oauth2Login(oauth -> oauth.successHandler(successHandler))
             .httpBasic(AbstractHttpConfigurer::disable);
 
