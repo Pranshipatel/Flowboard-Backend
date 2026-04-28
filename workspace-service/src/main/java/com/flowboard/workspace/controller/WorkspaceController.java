@@ -10,8 +10,8 @@ import com.flowboard.workspace.dto.AddMemberRequest;
 import com.flowboard.workspace.dto.CreateWorkspaceRequest;
 import com.flowboard.workspace.dto.UpdateMemberRoleRequest;
 import com.flowboard.workspace.dto.UpdateWorkspaceRequest;
+import com.flowboard.workspace.dto.WorkspaceMemberResponse;
 import com.flowboard.workspace.dto.WorkspaceResponse;
-import com.flowboard.workspace.entity.WorkspaceMember;
 import com.flowboard.workspace.service.WorkspaceService;
 
 import java.util.List;
@@ -34,6 +34,7 @@ public class WorkspaceController {
             @RequestHeader(value = "X-User-Email", required = false) String userEmail,
             @RequestHeader(value = "Authorization", required = false) String authHeader
     ){
+    	System.out.println("X-User-Id: " + userIdHeader);
         Long userId = resolveUserId(userIdHeader, userEmail, authHeader);
 
         return ResponseEntity.status(HttpStatus.CREATED)
@@ -99,7 +100,7 @@ public class WorkspaceController {
 
     // Add member
     @PostMapping("/{id}/members")
-    public ResponseEntity<WorkspaceMember> addMember(
+    public ResponseEntity<WorkspaceMemberResponse> addMember(
             @PathVariable Long id,
             @Valid @RequestBody AddMemberRequest request,
             @RequestHeader(value = "X-User-Id", required = false) Long userIdHeader,
@@ -113,7 +114,7 @@ public class WorkspaceController {
     }
 
     // Remove member
-    @DeleteMapping("/{id}/member/{memberId}")
+    @DeleteMapping("/{id}/members/{memberId}")
     public ResponseEntity<String> removeMember(
             @PathVariable Long id,
             @PathVariable Long memberId,
@@ -145,7 +146,7 @@ public class WorkspaceController {
 
     // Get members
     @GetMapping("/{id}/members")
-    public ResponseEntity<List<WorkspaceMember>> getMembers(@PathVariable Long id){
+    public ResponseEntity<List<WorkspaceMemberResponse>> getMembers(@PathVariable Long id) {
         return ResponseEntity.ok(workspaceService.getMembers(id));
     }
 
