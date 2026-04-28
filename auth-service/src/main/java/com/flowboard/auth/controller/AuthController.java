@@ -107,10 +107,21 @@ public class AuthController {
 
     // ================= SEARCH =================
 
-    // Search users by keyword
+    // Search users by keyword (returns safe DTOs, not raw entities)
     @GetMapping("/search")
-    public ResponseEntity<List<User>> searchUsers(@RequestParam String key){
-        return ResponseEntity.ok(authService.searchUsers(key));
+    public ResponseEntity<List<UserProfileDto>> searchUsers(@RequestParam String key){
+        return ResponseEntity.ok(
+            authService.searchUsers(key).stream()
+                .map(this::toProfileDto)
+                .collect(java.util.stream.Collectors.toList())
+        );
+    }
+
+    // Get user by ID (public lookup for workspace member details)
+    @GetMapping("/users/{id}")
+    public ResponseEntity<UserProfileDto> getUserById(@PathVariable Long id){
+        User user = authService.getUserById(id);
+        return ResponseEntity.ok(toProfileDto(user));
     }
 
 
