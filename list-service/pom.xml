@@ -8,7 +8,6 @@
     <parent>
         <groupId>org.springframework.boot</groupId>
         <artifactId>spring-boot-starter-parent</artifactId>
-        <!-- FIXED: 4.0.6 ❌ → valid version -->
         <version>3.2.4</version>
         <relativePath/>
     </parent>
