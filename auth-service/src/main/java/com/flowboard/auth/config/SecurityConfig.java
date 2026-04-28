@@ -73,12 +73,14 @@ public class SecurityConfig {
                                 "/api/v1/auth/login",
                                 "/api/v1/auth/refresh",
                                 "/api/v1/auth/validate",
-                                "/api/v1/auth/verify-email",        // new
-                                "/api/v1/auth/resend-verification", // new
-                                "/api/v1/auth/forgot-password",     // new
+                                "/api/v1/auth/verify-email",        
+                                "/api/v1/auth/resend-verification",
+                                "/api/v1/auth/forgot-password",     
                                 "/api/v1/auth/reset-password",
                                 "/oauth2/**",
-                                "/login/oauth2/**"
+                                "/login/oauth2/**",
+                                "/swagger-ui/**",
+                                "/v3/api-docs/**"
                         ).permitAll()
 
                         // Admin endpoints (require authentication)
