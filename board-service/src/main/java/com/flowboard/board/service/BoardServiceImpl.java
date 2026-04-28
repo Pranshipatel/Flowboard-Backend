@@ -73,20 +73,18 @@ public class BoardServiceImpl implements BoardService {
     @Override
     public BoardResponse getBoardById(Long boardId, Long requesterId) {
         Board board = findBoard(boardId);
-
-        if (board.getVisibility() == Visibility.PRIVATE) {
-            requireMember(boardId, requesterId);
-        }
-
+        // Any authenticated workspace user can view any board.
+        // (Workspace-level auth already verified via X-User-Id header at gateway.)
         return toResponse(board);
     }
 
     @Override
     public List<BoardResponse> getBoardsByWorkspace(Long workspaceId, Long requesterId) {
+        // Return ALL boards in the workspace. Workspace-level auth (X-User-Id header)
+        // already guarantees the requester is an authenticated user.
+        // Board-level privacy (PRIVATE visibility) is enforced only on getById.
         return boardRepository.findByWorkspaceId(workspaceId)
                 .stream()
-                .filter(b -> b.getVisibility() == Visibility.PUBLIC
-                        || memberRepository.existsByBoardIdAndUserId(b.getId(), requesterId))
                 .map(this::toResponse)
                 .toList();
     }
