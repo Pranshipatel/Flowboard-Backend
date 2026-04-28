@@ -2,7 +2,6 @@ package com.flowboard.workspace.service;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.hibernate.jdbc.Work;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -11,6 +10,7 @@ import com.flowboard.workspace.dto.AddMemberRequest;
 import com.flowboard.workspace.dto.CreateWorkspaceRequest;
 import com.flowboard.workspace.dto.UpdateMemberRoleRequest;
 import com.flowboard.workspace.dto.UpdateWorkspaceRequest;
+import com.flowboard.workspace.dto.WorkspaceMemberResponse;
 import com.flowboard.workspace.dto.WorkspaceResponse;
 import com.flowboard.workspace.entity.MemberRole;
 import com.flowboard.workspace.entity.Visibility;
@@ -141,32 +141,38 @@ public class WorkspaceServiceImpl implements WorkspaceService {
     // Add member
     @Override
     @Transactional
-    public WorkspaceMember addMember(Long workspaceId,
-                                     AddMemberRequest request,
-                                     Long requesterId){
+    public WorkspaceMemberResponse addMember(Long workspaceId,
+                                             AddMemberRequest request,
+                                             Long requesterId) {
 
         findWorkspace(workspaceId);
         requireAdmin(workspaceId, requesterId);
 
-        if(memberRepository.existsByWorkspaceIdAndUserId(workspaceId, request.getUserId())){
+        if (memberRepository.existsByWorkspaceIdAndUserId(workspaceId, request.getUserId())) {
             throw new CustomException("User is already a member of this workspace", HttpStatus.BAD_REQUEST);
         }
 
         Workspace workspace = findWorkspace(workspaceId);
 
+        MemberRole role = request.getRole() != null ? request.getRole() : MemberRole.MEMBER;
         WorkspaceMember member = WorkspaceMember.builder()
                 .workspace(workspace)
                 .userId(request.getUserId())
-                .role(request.getRole()!=null ? request.getRole() : MemberRole.MEMBER)
+                .role(role)
                 .joinedAt(LocalDateTime.now())
                 .build();
 
         memberRepository.save(member);
 
         log.info("Member added: workspaceId={} userId={} role={}",
-                workspaceId, request.getUserId(), member.getRole());
+                workspaceId, request.getUserId(), role);
 
-        return member;
+        return new WorkspaceMemberResponse(
+                member.getId(),
+                member.getUserId(),
+                role.name(),
+                workspaceId
+        );
     }
 
     // Remove member
@@ -214,9 +220,17 @@ public class WorkspaceServiceImpl implements WorkspaceService {
     }
 
     @Override
-    public List<WorkspaceMember> getMembers(Long workspaceId){
+    public List<WorkspaceMemberResponse> getMembers(Long workspaceId) {
         findWorkspace(workspaceId);
-        return memberRepository.findByWorkspaceId(workspaceId);
+        return memberRepository.findByWorkspaceId(workspaceId)
+                .stream()
+                .map(m -> new WorkspaceMemberResponse(
+                        m.getId(),
+                        m.getUserId(),
+                        m.getRole().name(),
+                        workspaceId
+                ))
+                .toList();
     }
 
     // ===== Helper methods =====
