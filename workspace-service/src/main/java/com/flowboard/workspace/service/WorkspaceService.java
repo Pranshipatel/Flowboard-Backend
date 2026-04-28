@@ -8,8 +8,8 @@ import com.flowboard.workspace.dto.AddMemberRequest;
 import com.flowboard.workspace.dto.CreateWorkspaceRequest;
 import com.flowboard.workspace.dto.UpdateMemberRoleRequest;
 import com.flowboard.workspace.dto.UpdateWorkspaceRequest;
+import com.flowboard.workspace.dto.WorkspaceMemberResponse;
 import com.flowboard.workspace.dto.WorkspaceResponse;
-import com.flowboard.workspace.entity.WorkspaceMember;
 
 public interface WorkspaceService {
 
@@ -23,8 +23,8 @@ public interface WorkspaceService {
     void deleteWorkspace(Long workspaceId, Long requesterId);
 
     // Member management
-    WorkspaceMember addMember(Long workspaceId, AddMemberRequest request, Long requesterId);
+    WorkspaceMemberResponse addMember(Long workspaceId, AddMemberRequest request, Long requesterId);
     void removeMember(Long workspaceId, Long userId, Long requesterId);
-    void updateMemberRole(Long workspaceId, Long userId, UpdateMemberRoleRequest requesr, Long requesterId);
-    List<WorkspaceMember> getMembers(Long workspaceId);
+    void updateMemberRole(Long workspaceId, Long userId, UpdateMemberRoleRequest request, Long requesterId);
+    List<WorkspaceMemberResponse> getMembers(Long workspaceId);
 }
