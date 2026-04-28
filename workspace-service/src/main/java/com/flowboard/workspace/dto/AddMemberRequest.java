@@ -3,14 +3,14 @@ package com.flowboard.workspace.dto;
 
 import com.flowboard.workspace.entity.MemberRole;
 
-import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
 import lombok.Data;
 
 @Data
 public class AddMemberRequest {
 
     // User to be added
-    @NotBlank(message = "User ID is required")
+    @NotNull(message = "User ID is required")
     private Long userId;
 
     // Default role
