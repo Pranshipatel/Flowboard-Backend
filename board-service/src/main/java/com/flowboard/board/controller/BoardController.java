@@ -14,6 +14,7 @@ import org.springframework.web.bind.annotation.RestController;
 import com.flowboard.board.dto.AddBoardMemberRequest;
 import com.flowboard.board.dto.BoardResponse;
 import com.flowboard.board.dto.CreateBoardRequest;
+import com.flowboard.board.dto.PublicBoardDetailResponse;
 import com.flowboard.board.dto.UpdateBoardMemberRoleRequest;
 import com.flowboard.board.dto.UpdateBoardRequest;
 import com.flowboard.board.entity.BoardMember;
@@ -38,15 +39,21 @@ public class BoardController {
         throw new CustomException("User identification header is missing", HttpStatus.BAD_REQUEST);
     }
 
+    private boolean isPremium(String plan, String status) {
+        return "PREMIUM".equalsIgnoreCase(plan) && "ACTIVE".equalsIgnoreCase(status);
+    }
+
     @PostMapping
     public ResponseEntity<BoardResponse> create(
             @Valid @RequestBody CreateBoardRequest request,
             @RequestHeader(value = "X-User-Id", required = false) Long userIdHeader,
-            @RequestHeader(value = "X-User-Email", required = false) String userEmail
+            @RequestHeader(value = "X-User-Email", required = false) String userEmail,
+            @RequestHeader(value = "X-Subscription-Plan", required = false, defaultValue = "FREE") String plan,
+            @RequestHeader(value = "X-Subscription-Status", required = false, defaultValue = "EXPIRED") String status
     ){
         Long userId = resolveUserId(userIdHeader, userEmail);
         return ResponseEntity.status(HttpStatus.CREATED)
-                .body(boardService.createBoard(request, userId));
+                .body(boardService.createBoard(request, userId, isPremium(plan, status)));
     }
 
     @GetMapping("/{id}")
@@ -63,10 +70,12 @@ public class BoardController {
     public ResponseEntity<List<BoardResponse>> getByWorkspace(
             @PathVariable Long workspaceId,
             @RequestHeader(value = "X-User-Id", required = false) Long userIdHeader,
-            @RequestHeader(value = "X-User-Email", required = false) String userEmail
+            @RequestHeader(value = "X-User-Email", required = false) String userEmail,
+            @RequestHeader(value = "X-Subscription-Plan", required = false, defaultValue = "FREE") String plan,
+            @RequestHeader(value = "X-Subscription-Status", required = false, defaultValue = "EXPIRED") String status
     ){
         Long userId = resolveUserId(userIdHeader, userEmail);
-        return ResponseEntity.ok(boardService.getBoardsByWorkspace(workspaceId, userId));
+        return ResponseEntity.ok(boardService.getBoardsByWorkspace(workspaceId, userId, isPremium(plan, status)));
     }
 
     @GetMapping("member/{userId}")
@@ -82,6 +91,16 @@ public class BoardController {
     @GetMapping("/public")
     public ResponseEntity<List<BoardResponse>> getPublic(){
         return ResponseEntity.ok(boardService.getPublicBoards());
+    }
+
+    @GetMapping("/public/{id}/details")
+    public ResponseEntity<PublicBoardDetailResponse> getPublicBoardDetail(@PathVariable Long id){
+        return ResponseEntity.ok(boardService.getPublicBoardDetail(id));
+    }
+
+    @GetMapping("/public/workspace/{workspaceId}/details")
+    public ResponseEntity<List<PublicBoardDetailResponse>> getPublicWorkspaceBoardDetails(@PathVariable Long workspaceId){
+        return ResponseEntity.ok(boardService.getPublicBoardDetailsByWorkspace(workspaceId));
     }
 
     @GetMapping("/workspace/{workspaceId}/closed")

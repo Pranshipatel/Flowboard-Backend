@@ -8,6 +8,7 @@ import java.time.LocalDateTime;
 import java.util.List;
 
 import com.flowboard.board.entity.BoardMemberRole;
+import com.flowboard.board.entity.BoardPriority;
 import com.flowboard.board.entity.Visibility;
 
 @Data
@@ -24,8 +25,15 @@ public class BoardResponse {
     private boolean isClosed;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
+    private LocalDateTime dueDate;
+    private BoardPriority priority;
     private int memberCount;
     private List<MemberDTO> members;
+
+    // Progress stats
+    private long totalCards;
+    private long doneCards;
+    private int progressPercentage;
 
     private BoardAnalytics analytics;
 

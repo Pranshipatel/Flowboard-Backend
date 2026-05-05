@@ -1,6 +1,7 @@
 package com.flowboard.board.dto;
 
 
+import com.flowboard.board.entity.BoardPriority;
 import com.flowboard.board.entity.Visibility;
 
 import jakarta.validation.constraints.NotBlank;
@@ -42,6 +43,16 @@ public class CreateBoardRequest {
      * Visibility of the board (default: PRIVATE)
      */
     private Visibility visibility = Visibility.PRIVATE;
+
+    /**
+     * Due date for the board
+     */
+    private java.time.LocalDateTime dueDate;
+
+    /**
+     * Priority of the board
+     */
+    private BoardPriority priority;
 
     /* ================= Utility ================= */
 

@@ -1,0 +1,539 @@
+server:
+  port: 8080
+
+spring:
+  config:
+    import: optional:file:../../.env[.properties]
+  application:
+    name: api-gateway
+
+  cloud:
+    gateway:
+      routes:
+
+        # ── Auth Service ──────────────────────────────────────────────
+        - id: auth-service
+          uri: lb://AUTH-SERVICE
+          predicates:
+            - Path=/api/v1/auth/**
+          filters:
+            - name: AuthFilter
+              args:
+                excludedPaths: >
+                  /api/v1/auth/register,
+                  /api/v1/auth/login,
+                  /api/v1/auth/profile,
+                  /api/v1/auth/logout,
+                  /api/v1/auth/refresh,
+                  /api/v1/auth/validate,
+                  /api/v1/auth/verify-email,
+                  /api/v1/auth/resend-verification,
+                  /api/v1/auth/forgot-password,
+                  /api/v1/auth/reset-password,
+                  /v3/api-docs,
+                  /v3/api-docs/**,
+                  /swagger-ui,
+                  /swagger-ui/**,
+                  /swagger-ui/index.html
+        # OAuth2 — no AuthFilter
+        - id: oauth2-login
+          uri: lb://AUTH-SERVICE
+          predicates:
+            - Path=/oauth2/**,/login/oauth2/**
+
+        # ── Admin Service ─────────────────────────────────────────────
+        - id: admin-service
+          uri: lb://ADMIN-SERVICE
+          predicates:
+            - Path=/api/v1/admin/**
+          filters:
+            - name: AuthFilter
+              args:
+                excludedPaths: >
+                  /v3/api-docs,
+                  /v3/api-docs/**,
+                  /swagger-ui,
+                  /swagger-ui/**,
+                  /swagger-ui/index.html
+
+        # ── Workspace Service ─────────────────────────────────────────
+        - id: workspace-service
+          uri: lb://WORKSPACE-SERVICE
+          predicates:
+            - Path=/api/v1/workspaces/**
+          filters:
+            - name: AuthFilter
+              args:
+                excludedPaths: >
+                  /api/v1/workspaces/public,
+                  /v3/api-docs,
+                  /v3/api-docs/**,
+                  /swagger-ui,
+                  /swagger-ui/**,
+                  /swagger-ui/index.html
+
+        # ── Board Service ─────────────────────────────────────────────
+        - id: board-service
+          uri: lb://BOARD-SERVICE
+          predicates:
+            - Path=/api/v1/boards/**
+          filters:
+            - name: AuthFilter
+              args:
+                excludedPaths: >
+                  /api/v1/boards/public,
+                  /api/v1/boards/public/**,
+                  /v3/api-docs,
+                  /v3/api-docs/**,
+                  /swagger-ui,
+                  /swagger-ui/**,
+                  /swagger-ui/index.html
+            - name: PremiumSubscriptionFilter
+              args:
+                enabled: true
+                requirePremium: false
+
+        # ── List Service (PREMIUM) ────────────────────────────────────
+        - id: list-service
+          uri: lb://LIST-SERVICE
+          predicates:
+            - Path=/api/v1/lists/**
+          filters:
+            - name: AuthFilter
+              args:
+                excludedPaths: >
+                  /v3/api-docs,
+                  /v3/api-docs/**,
+                  /swagger-ui,
+                  /swagger-ui/**,
+                  /swagger-ui/index.html
+            - name: PremiumSubscriptionFilter
+              args:
+                enabled: true
+                requirePremium: false
+
+        # ── Card Service (PREMIUM) ────────────────────────────────────
+        - id: card-service
+          uri: lb://CARD-SERVICE
+          predicates:
+            - Path=/api/v1/cards/**
+          filters:
+            - name: AuthFilter
+              args:
+                excludedPaths: >
+                  /v3/api-docs,
+                  /v3/api-docs/**,
+                  /swagger-ui,
+                  /swagger-ui/**,
+                  /swagger-ui/index.html
+            - name: PremiumSubscriptionFilter
+              args:
+                enabled: true
+                requirePremium: false
+
+        # ── Notification Service (PREMIUM) ────────────────────────────
+        - id: notification-service
+          uri: lb://NOTIFICATION-SERVICE
+          predicates:
+            - Path=/api/v1/notifications/**
+          filters:
+            - name: AuthFilter
+              args:
+                excludedPaths: >
+                  /v3/api-docs,
+                  /v3/api-docs/**,
+                  /swagger-ui,
+                  /swagger-ui/**,
+                  /swagger-ui/index.html
+            - name: PremiumSubscriptionFilter
+              args:
+                enabled: true
+
+        # ── Payment + Subscription Service ────────────────────────────
+        - id: payment-service
+          uri: lb://PAYMENT-SERVICE
+          predicates:
+            - Path=/api/v1/payments/**,/api/v1/subscription/**
+          filters:
+            - name: AuthFilter
+              args:
+                excludedPaths: >
+                  /v3/api-docs,
+                  /v3/api-docs/**,
+                  /swagger-ui,
+                  /swagger-ui/**,
+                  /swagger-ui/index.html
+
+        # ── Swagger Docs Aggregation Routes ───────────────────────────
+        - id: auth-docs
+          uri: lb://AUTH-SERVICE
+          predicates:
+            - Path=/v3/api-docs/auth
+          filters:
+            - RewritePath=/v3/api-docs/auth, /v3/api-docs
+
+        - id: admin-docs
+          uri: lb://ADMIN-SERVICE
+          predicates:
+            - Path=/v3/api-docs/admin
+          filters:
+            - RewritePath=/v3/api-docs/admin, /v3/api-docs
+
+        - id: workspace-docs
+          uri: lb://WORKSPACE-SERVICE
+          predicates:
+            - Path=/v3/api-docs/workspace
+          filters:
+            - RewritePath=/v3/api-docs/workspace, /v3/api-docs
+
+        - id: board-docs
+          uri: lb://BOARD-SERVICE
+          predicates:
+            - Path=/v3/api-docs/board
+          filters:
+            - RewritePath=/v3/api-docs/board, /v3/api-docs
+
+        - id: list-docs
+          uri: lb://LIST-SERVICE
+          predicates:
+            - Path=/v3/api-docs/list
+          filters:
+            - RewritePath=/v3/api-docs/list, /v3/api-docs
+
+        - id: card-docs
+          uri: lb://CARD-SERVICE
+          predicates:
+            - Path=/v3/api-docs/card
+          filters:
+            - RewritePath=/v3/api-docs/card, /v3/api-docs
+
+        - id: notification-docs
+          uri: lb://NOTIFICATION-SERVICE
+          predicates:
+            - Path=/v3/api-docs/notification
+          filters:
+            - RewritePath=/v3/api-docs/notification, /v3/api-docs
+
+        - id: payment-docs
+          uri: lb://PAYMENT-SERVICE
+          predicates:
+            - Path=/v3/api-docs/payment
+          filters:
+            - RewritePath=/v3/api-docs/payment, /v3/api-docs
+
+      # ── CORS CONFIG (FIXED FOR SWAGGER + PREFLIGHT) ─────────────────
+      globalcors:
+        add-to-simple-url-handler-mapping: true
+        cors-configurations:
+          '[/**]':
+            allowedOriginPatterns:
+              - "http://localhost:*"
+              - "http://127.0.0.1:*"
+              - "http://192.168.56.1:*"
+            allowedMethods:
+              - GET
+              - POST
+              - PUT
+              - PATCH
+              - DELETE
+              - OPTIONS
+            allowedHeaders:
+              - Authorization
+              - Content-Type
+              - Accept
+              - Origin
+              - Access-Control-Request-Method
+              - Access-Control-Request-Headers
+              - X-User-Id
+              - X-User-Email
+              - X-User-Role
+            exposedHeaders:
+              - Authorization
+            allowCredentials: true
+            maxAge: 3600
+
+# ✅ IMPORTANT — MUST BE OUTSIDE "spring"
+springdoc:
+  swagger-ui:
+    path: /swagger-ui/index.html
+    urls:
+      - name: auth-service
+        url: /v3/api-docs/auth
+      - name: admin-service
+        url: /v3/api-docs/admin
+      - name: workspace-service
+        url: /v3/api-docs/workspace
+      - name: board-service
+        url: /v3/api-docs/board
+      - name: list-service
+        url: /v3/api-docs/list
+      - name: card-service
+        url: /v3/api-docs/card
+      - name: notification-service
+        url: /v3/api-docs/notification
+      - name: payment-service
+        url: /v3/api-docs/payment
+
+eureka:
+  client:
+    service-url:
+      defaultZone: ${EUREKA_DEFAULT_ZONE:http://localhost:8761/eureka/}
+  instance:
+    prefer-ip-address: true
+
+jwt:
+  secret: ${JWT_SECRET}
+
+logging:
+  level:
+    org.springframework.cloud.gateway: INFO
+    com.flowBoard: DEBUG
+
+
+
+#server:
+#  port: 8080
+#
+#spring:
+#  application:
+#    name: api-gateway
+#
+#  cloud:
+#    gateway:
+#      routes:
+#
+#        # ── Auth Service ──────────────────────────────────────────────
+#        - id: auth-service
+#          uri: lb://AUTH-SERVICE
+#          predicates:
+#            - Path=/api/v1/auth/**
+#          filters:
+#            - name: AuthFilter
+#              args:
+#                excludedPaths: >
+#                  /api/v1/auth/register,
+#                  /api/v1/auth/login,
+#                  /api/v1/auth/profile,
+#                  /api/v1/auth/logout,
+#                  /api/v1/auth/refresh,
+#                  /api/v1/auth/validate,
+#                  /api/v1/auth/verify-email,
+#                  /api/v1/auth/resend-verification,
+#                  /api/v1/auth/forgot-password,
+#                  /api/v1/auth/reset-password,
+#                  /v3/api-docs,
+#                  /v3/api-docs/**,
+#                  /swagger-ui,
+#                  /swagger-ui/**,
+#                  /swagger-ui/index.html
+#
+#        # OAuth2 — no AuthFilter
+#        - id: oauth2-login
+#          uri: lb://AUTH-SERVICE
+#          predicates:
+#            - Path=/oauth2/**,/login/oauth2/**
+#
+#        # ── Workspace Service ─────────────────────────────────────────
+#        - id: workspace-service
+#          uri: lb://WORKSPACE-SERVICE
+#          predicates:
+#            - Path=/api/v1/workspaces/**
+#          filters:
+#            - name: AuthFilter
+#              args:
+#                excludedPaths: >
+#                  /api/v1/workspaces/public,
+#                  /v3/api-docs,
+#                  /v3/api-docs/**,
+#                  /swagger-ui/**
+#
+#        # ── Board Service ─────────────────────────────────────────────
+#        - id: board-service
+#          uri: lb://BOARD-SERVICE
+#          predicates:
+#            - Path=/api/v1/boards/**
+#          filters:
+#            - name: AuthFilter
+#              args:
+#                excludedPaths: >
+#                  /api/v1/boards/public,
+#                  /v3/api-docs,
+#                  /v3/api-docs/**,
+#                  /swagger-ui/**
+#
+#        # ── List Service (PREMIUM) ────────────────────────────────────
+#        - id: list-service
+#          uri: lb://LIST-SERVICE
+#          predicates:
+#            - Path=/api/v1/lists/**
+#          filters:
+#            - name: AuthFilter
+#              args:
+#                excludedPaths: >
+#                  /v3/api-docs,
+#                  /v3/api-docs/**,
+#                  /swagger-ui/**
+#            - name: PremiumSubscriptionFilter
+#              args:
+#                enabled: true
+#
+#        # ── Card Service (PREMIUM) ────────────────────────────────────
+#        - id: card-service
+#          uri: lb://CARD-SERVICE
+#          predicates:
+#            - Path=/api/v1/cards/**
+#          filters:
+#            - name: AuthFilter
+#              args:
+#                excludedPaths: >
+#                  /v3/api-docs,
+#                  /v3/api-docs/**,
+#                  /swagger-ui/**
+#            - name: PremiumSubscriptionFilter
+#              args:
+#                enabled: true
+#
+#        # ── Notification Service (PREMIUM) ────────────────────────────
+#        - id: notification-service
+#          uri: lb://NOTIFICATION-SERVICE
+#          predicates:
+#            - Path=/api/v1/notifications/**
+#          filters:
+#            - name: AuthFilter
+#              args:
+#                excludedPaths: >
+#                  /v3/api-docs,
+#                  /v3/api-docs/**,
+#                  /swagger-ui/**
+#            - name: PremiumSubscriptionFilter
+#              args:
+#                enabled: true
+#
+#        # ── Payment + Subscription Service ────────────────────────────
+#        - id: payment-service
+#          uri: lb://PAYMENT-SERVICE
+#          predicates:
+#            - Path=/api/v1/payments/**,/api/v1/subscription/**
+#          filters:
+#            - name: AuthFilter
+#              args:
+#                excludedPaths: >
+#                  /v3/api-docs,
+#                  /v3/api-docs/**,
+#                  /swagger-ui,
+#                  /swagger-ui/**,
+#                  /swagger-ui/index.html
+#
+#        # ── Swagger Docs Aggregation Routes ───────────────────────────
+#        - id: auth-docs
+#          uri: lb://AUTH-SERVICE
+#          predicates:
+#            - Path=/v3/api-docs/auth
+#          filters:
+#            - RewritePath=/v3/api-docs/auth, /v3/api-docs
+#
+#        - id: workspace-docs
+#          uri: lb://WORKSPACE-SERVICE
+#          predicates:
+#            - Path=/v3/api-docs/workspace
+#          filters:
+#            - RewritePath=/v3/api-docs/workspace, /v3/api-docs
+#
+#        - id: board-docs
+#          uri: lb://BOARD-SERVICE
+#          predicates:
+#            - Path=/v3/api-docs/board
+#          filters:
+#            - RewritePath=/v3/api-docs/board, /v3/api-docs
+#
+#        - id: list-docs
+#          uri: lb://LIST-SERVICE
+#          predicates:
+#            - Path=/v3/api-docs/list
+#          filters:
+#            - RewritePath=/v3/api-docs/list, /v3/api-docs
+#
+#        - id: card-docs
+#          uri: lb://CARD-SERVICE
+#          predicates:
+#            - Path=/v3/api-docs/card
+#          filters:
+#            - RewritePath=/v3/api-docs/card, /v3/api-docs
+#
+#        - id: notification-docs
+#          uri: lb://NOTIFICATION-SERVICE
+#          predicates:
+#            - Path=/v3/api-docs/notification
+#          filters:
+#            - RewritePath=/v3/api-docs/notification, /v3/api-docs
+#
+#        # Optional: payment-service docs aggregation (enable if payment-service exposes springdoc)
+#        - id: payment-docs
+#          uri: lb://PAYMENT-SERVICE
+#          predicates:
+#            - Path=/v3/api-docs/payment
+#          filters:
+#            - RewritePath=/v3/api-docs/payment, /v3/api-docs
+#
+#      # ── CORS CONFIG (UPDATED) ──────────────────────────────────────
+#      globalcors:
+#        add-to-simple-url-handler-mapping: true
+#        cors-configurations:
+#          '[/**]':
+#            # Use patterns so localhost/IP/port variations still work
+#            allowedOriginPatterns:
+#              - "http://localhost:4200"
+#            allowedMethods:
+#              - GET
+#              - POST
+#              - PUT
+#              - PATCH
+#              - DELETE
+#              - OPTIONS
+#            # Be explicit (more reliable than "*", especially with credentials)
+#            allowedHeaders:
+#              - Authorization
+#              - Content-Type
+#              - Accept
+#              - X-User-Id
+#              - X-User-Email
+#            exposedHeaders:
+#              - Authorization
+#            allowCredentials: true
+#            maxAge: 3600
+#
+## ✅ IMPORTANT — MUST BE OUTSIDE "spring"
+#springdoc:
+#  swagger-ui:
+#    path: /swagger-ui/index.html
+#    urls:
+#      - name: auth-service
+#        url: /v3/api-docs/auth
+#      - name: workspace-service
+#        url: /v3/api-docs/workspace
+#      - name: board-service
+#        url: /v3/api-docs/board
+#      - name: list-service
+#        url: /v3/api-docs/list
+#      - name: card-service
+#        url: /v3/api-docs/card
+#      - name: notification-service
+#        url: /v3/api-docs/notification
+#      - name: payment-service
+#        url: /v3/api-docs/payment
+#
+#eureka:
+#  client:
+#    service-url:
+#      defaultZone: http://localhost:8761/eureka/
+#  instance:
+#    prefer-ip-address: true
+#
+#jwt:
+#  secret: ${JWT_SECRET}
+#
+#logging:
+#  level:
+#    org.springframework.cloud.gateway: INFO
+#    com.flowBoard: DEBUG
+#

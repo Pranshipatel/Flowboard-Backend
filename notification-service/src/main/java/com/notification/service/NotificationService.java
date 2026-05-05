@@ -50,29 +50,9 @@ public interface NotificationService {
     void deleteReadNotifications(Long recipientId);
 
 
-    // Creates assignment notification (optionally triggers email)
-    void notifyAssignment(Long recipientId, Long actorId,
-                          Long cardId, String cardTitle,
-                          String recipientEmail);
-
-    // Creates mention notification when user is tagged
-    void notifyMention(Long recipientId, Long actorId,
-                       Long cardId, String cardTitle);
 
     // Notifies user about upcoming due date
     void notifyDueDateApproaching(Long recipientId, Long cardId,
                                   String cardTitle, String timeLeft);
 
-    // Notifies user when card is moved to "Done"
-    void notifyCardMovedToDone(Long recipientId, Long actorId,
-                               Long cardId, String cardTitle);
-
-    // Notifies user about replies on their comment
-    void notifyCommentReply(Long recipientId, Long actorId,
-                            Long cardId, String cardTitle);
-
-    // Notifies user when task becomes overdue (optionally triggers email)
-    void notifyOverdue(Long recipientId, Long cardId,
-                       String cardTitle, String dueDate,
-                       String recipientEmail);
 }

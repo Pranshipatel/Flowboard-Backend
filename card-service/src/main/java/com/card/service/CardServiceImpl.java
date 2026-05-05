@@ -24,12 +24,21 @@ import java.util.concurrent.atomic.AtomicInteger;
 @Slf4j
 public class CardServiceImpl implements CardService{
 
+    private static final long FREE_CARD_LIMIT = 2;
+
     private final CardRepository cardRepository;
     private final CardActivityRepository activityRepository;
 
     @Override
     @Transactional
-    public CardResponse createCard(CreateCardRequest request, Long userId) {
+    public CardResponse createCard(CreateCardRequest request, Long userId, boolean premium) {
+        if (!premium && cardRepository.countByBoardIdAndIsArchivedFalse(request.getBoardId()) >= FREE_CARD_LIMIT) {
+            throw new CustomException(
+                    "Free users can create up to 2 cards per board. Upgrade to premium for unlimited cards.",
+                    HttpStatus.FORBIDDEN
+            );
+        }
+
         int position;
 
         if(request.getPosition()!=null){
@@ -502,5 +511,16 @@ public class CardServiceImpl implements CardService{
                 .newValue(a.getNewValue())
                 .createdAt(a.getCreatedAt())
                 .build();
+    }
+
+    @Override
+    public List<BoardStatsResponse> getBoardStats(List<Long> boardIds) {
+        if (boardIds == null || boardIds.isEmpty()) return List.of();
+        List<Object[]> results = cardRepository.getStatsByBoardIds(boardIds);
+        return results.stream().map(row -> BoardStatsResponse.builder()
+                .boardId(((Number) row[0]).longValue())
+                .totalCards(((Number) row[1]).longValue())
+                .doneCards(((Number) row[2]).longValue())
+                .build()).toList();
     }
 }

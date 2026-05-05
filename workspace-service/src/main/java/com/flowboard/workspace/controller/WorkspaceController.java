@@ -49,8 +49,7 @@ public class WorkspaceController {
             @RequestHeader(value = "X-User-Email", required = false) String userEmail,
             @RequestHeader(value = "Authorization", required = false) String authHeader) {
 
-        Long userId = resolveUserId(userIdHeader, userEmail, authHeader);
-        return ResponseEntity.ok(workspaceService.getById(id, userId));
+        return ResponseEntity.ok(workspaceService.getById(id, userIdHeader));
     }
 
     // Get by owner

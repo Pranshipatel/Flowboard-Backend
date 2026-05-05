@@ -1,0 +1,35 @@
+server:
+  port: 8088
+
+spring:
+  config:
+    import: optional:file:../../.env[.properties]
+  application:
+    name: payment-service
+
+  datasource:
+    url: jdbc:mysql://${MYSQL_HOST:localhost}:${MYSQL_PORT:3306}/${PAYMENT_DB_NAME:flowboard_payment}
+    username: ${MYSQL_USERNAME}
+    password: ${MYSQL_PASSWORD}
+  jpa:
+    hibernate:
+      ddl-auto: update
+    properties:
+      hibernate:
+        format_sql: true
+
+eureka:
+  client:
+    service-url:
+      defaultZone: ${EUREKA_DEFAULT_ZONE:http://localhost:8761/eureka/}
+  instance:
+    prefer-ip-address: true
+
+razorpay:
+  keyId: ${RAZORPAY_KEY_ID}
+  keySecret: ${RAZORPAY_KEY_SECRET}
+  skipVerification: ${RAZORPAY_SKIP_VERIFICATION:true}   # Set to false in production
+
+logging:
+  level:
+    com.payment: DEBUG

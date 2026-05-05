@@ -10,7 +10,7 @@ import java.util.List;
 public interface CardService {
 
     // Create & Fetch
-    CardResponse createCard(CreateCardRequest request, Long userId);
+    CardResponse createCard(CreateCardRequest request, Long userId, boolean premium);
     CardResponse getCardById(Long cardId);
 
     List<CardResponse> getCardByList(Long listId);
@@ -51,4 +51,6 @@ public interface CardService {
     // Activity
     List<CardActivityResponse> getCardActivity(Long cardId);
 
+    // Board Stats
+    List<BoardStatsResponse> getBoardStats(List<Long> boardIds);
 }

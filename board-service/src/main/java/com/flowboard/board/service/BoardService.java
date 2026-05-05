@@ -7,6 +7,7 @@ import java.util.List;
 import com.flowboard.board.dto.AddBoardMemberRequest;
 import com.flowboard.board.dto.BoardResponse;
 import com.flowboard.board.dto.CreateBoardRequest;
+import com.flowboard.board.dto.PublicBoardDetailResponse;
 import com.flowboard.board.dto.UpdateBoardMemberRoleRequest;
 import com.flowboard.board.dto.UpdateBoardRequest;
 import com.flowboard.board.entity.BoardMember;
@@ -14,13 +15,13 @@ import com.flowboard.board.entity.BoardMember;
 public interface BoardService {
 
     // Create board
-    BoardResponse createBoard(CreateBoardRequest request, Long createdById);
+    BoardResponse createBoard(CreateBoardRequest request, Long createdById, boolean premium);
 
     // Fetch single board
     BoardResponse getBoardById(Long workspace, Long requesterId);
 
     // Boards in a workspace
-    List<BoardResponse> getBoardsByWorkspace(Long workspaceId, Long requesterId);
+    List<BoardResponse> getBoardsByWorkspace(Long workspaceId, Long requesterId, boolean premium);
 
     // Boards where user is a member
     List<BoardResponse> getBoardsByMember(Long userId);
@@ -30,6 +31,10 @@ public interface BoardService {
 
     // Public boards
     List<BoardResponse> getPublicBoards();
+
+    PublicBoardDetailResponse getPublicBoardDetail(Long boardId);
+
+    List<PublicBoardDetailResponse> getPublicBoardDetailsByWorkspace(Long workspaceId);
 
     // Closed boards in workspace
     List<BoardResponse> getClosedBoards(Long workspaceId, Long requesterId);

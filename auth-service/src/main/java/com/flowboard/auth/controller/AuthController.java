@@ -151,6 +151,14 @@ public class AuthController {
         return ResponseEntity.ok(authService.getUsersByRole(role));
     }
 
+    // Update user role (admin only)
+    @PutMapping("/admin/users/{id}/role")
+    @PreAuthorize("hasAuthority('PLATFORM_ADMIN')")
+    public ResponseEntity<String> updateUserRole(@PathVariable Long id, @RequestParam String role){
+        authService.updateUserRole(id, role);
+        return ResponseEntity.ok("User role updated successfully");
+    }
+
     // Suspend user (admin only)
     @PutMapping("/admin/users/{id}/suspend")
     @PreAuthorize("hasAuthority('PLATFORM_ADMIN')")

@@ -91,4 +91,9 @@ public interface CardRepository extends JpaRepository<Card, Long> {
             @Param("keyword") String keyword,
             @Param("assigneeId") Long assigneeId);
 
+    @Query("SELECT c.boardId, COUNT(c), SUM(CASE WHEN c.status = 'DONE' THEN 1 ELSE 0 END) " +
+           "FROM Card c WHERE c.boardId IN :boardIds AND c.isArchived = false " +
+           "GROUP BY c.boardId")
+    List<Object[]> getStatsByBoardIds(@Param("boardIds") List<Long> boardIds);
+
 }

@@ -79,7 +79,6 @@ public class AuthFilter extends AbstractGatewayFilterFactory<AuthFilter.Config> 
                     .header("X-User-Email", email)
                     .header("X-User-Id", String.valueOf(userId))
                     .header("X-User-Role", role)
-                    .headers(h->h.remove(HttpHeaders.AUTHORIZATION))
                     .build();
 
             log.debug("JWT valid — email={} userId={} path={}", email, userId, path);
@@ -91,7 +90,13 @@ public class AuthFilter extends AbstractGatewayFilterFactory<AuthFilter.Config> 
         if (excludedPaths == null || excludedPaths.isBlank()) return false;
         List<String> excluded = Arrays.stream(excludedPaths.split(","))
                 .map(String::trim).toList();
-        return excluded.stream().anyMatch(path::equals);
+        return excluded.stream().anyMatch(pattern -> {
+            if (pattern.endsWith("/**")) {
+                String prefix = pattern.substring(0, pattern.length() - 3);
+                return path.equals(prefix) || path.startsWith(prefix + "/");
+            }
+            return path.equals(pattern);
+        });
     }
 
     private Mono<Void> reject(ServerWebExchange exchange, String message, HttpStatus status) {

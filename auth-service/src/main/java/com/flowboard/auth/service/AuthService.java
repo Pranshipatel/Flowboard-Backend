@@ -84,6 +84,9 @@ public interface AuthService {
     // Get users by role
     List<User> getUsersByRole(ROLE role);
 
+    // Update user role
+    void updateUserRole(Long userId, String role);
+
     // Suspend user account
     void suspendUser(Long id);
 

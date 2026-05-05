@@ -19,6 +19,9 @@ import com.flowboard.workspace.entity.WorkspaceMember;
 import com.flowboard.workspace.exception.CustomException;
 import com.flowboard.workspace.repository.WorkspaceMemberRepository;
 import com.flowboard.workspace.repository.WorkspaceRepository;
+import org.springframework.amqp.rabbit.core.RabbitTemplate;
+import com.flowboard.workspace.config.RabbitMQConfig;
+import com.flowboard.workspace.dto.SendNotificationRequest;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -33,6 +36,7 @@ public class WorkspaceServiceImpl implements WorkspaceService {
 
     private final WorkspaceRepository workspaceRepository;
     private final WorkspaceMemberRepository memberRepository;
+    private final RabbitTemplate rabbitTemplate;
 
     // Create workspace
     @Override
@@ -113,6 +117,10 @@ public class WorkspaceServiceImpl implements WorkspaceService {
         workspace.setDescription(request.getDescription());
 
         if(request.getVisibility()!=null){
+            workspace.setVisibility(request.getVisibility());
+        }
+
+        if(request.getLogoUrl()!=null){
             workspace.setLogoUrl(request.getLogoUrl());
         }
 
@@ -123,19 +131,50 @@ public class WorkspaceServiceImpl implements WorkspaceService {
         return toResponse(workspace);
     }
 
-    // Delete workspace (owner only)
     @Override
     @Transactional
     public void deleteWorkspace(Long workspaceId, Long requesterId){
 
         Workspace workspace = findWorkspace(workspaceId);
 
-        if(!workspace.getOwnerId().equals(requesterId)){
-            throw new CustomException("Only the workspace owner can delete it", HttpStatus.FORBIDDEN);
+        boolean isOwner = workspace.getOwnerId().equals(requesterId);
+        boolean isAdmin = false;
+        if (!isOwner) {
+            WorkspaceMember member = memberRepository.findByWorkspaceIdAndUserId(workspaceId, requesterId).orElse(null);
+            isAdmin = member != null && member.getRole() == MemberRole.ADMIN;
         }
+
+        if(!isOwner && !isAdmin){
+            throw new CustomException("Only the workspace owner or admin can delete it", HttpStatus.FORBIDDEN);
+        }
+
+        List<WorkspaceMember> members = memberRepository.findByWorkspaceId(workspaceId);
 
         workspaceRepository.delete(workspace);
         log.info("Workspace deleted: id={}", workspaceId);
+
+        try {
+            for (WorkspaceMember m : members) {
+                if (!m.getUserId().equals(requesterId)) {
+                    SendNotificationRequest notification = SendNotificationRequest.builder()
+                            .recipientId(m.getUserId())
+                            .actorId(requesterId)
+                            .type("BROADCAST")
+                            .title("Workspace Deleted")
+                            .message("The workspace '" + workspace.getName() + "' has been deleted.")
+                            .relatedId(workspaceId)
+                            .relatedType("WORKSPACE")
+                            .build();
+                    rabbitTemplate.convertAndSend(
+                            RabbitMQConfig.NOTIFICATION_EXCHANGE,
+                            RabbitMQConfig.NOTIFICATION_ROUTING_KEY,
+                            notification
+                    );
+                }
+            }
+        } catch (Exception e) {
+            log.error("Failed to send workspace deletion notifications", e);
+        }
     }
 
     // Add member
@@ -167,6 +206,25 @@ public class WorkspaceServiceImpl implements WorkspaceService {
         log.info("Member added: workspaceId={} userId={} role={}",
                 workspaceId, request.getUserId(), role);
 
+        try {
+            SendNotificationRequest notification = SendNotificationRequest.builder()
+                    .recipientId(request.getUserId())
+                    .actorId(requesterId)
+                    .type("ASSIGNMENT")
+                    .title("Added to Workspace")
+                    .message("You have been added to workspace '" + workspace.getName() + "' as a " + role.name())
+                    .relatedId(workspaceId)
+                    .relatedType("WORKSPACE")
+                    .build();
+            rabbitTemplate.convertAndSend(
+                    RabbitMQConfig.NOTIFICATION_EXCHANGE,
+                    RabbitMQConfig.NOTIFICATION_ROUTING_KEY,
+                    notification
+            );
+        } catch (Exception e) {
+            log.error("Failed to send notification for adding member", e);
+        }
+
         return new WorkspaceMemberResponse(
                 member.getId(),
                 member.getUserId(),
@@ -196,6 +254,25 @@ public class WorkspaceServiceImpl implements WorkspaceService {
         memberRepository.deleteByWorkspaceIdAndUserId(workspaceId, userId);
 
         log.info("Member removed: workspaceId={} userId={}", workspaceId, userId);
+
+        try {
+            SendNotificationRequest notification = SendNotificationRequest.builder()
+                    .recipientId(userId)
+                    .actorId(requesterid)
+                    .type("BROADCAST")
+                    .title("Removed from Workspace")
+                    .message("You have been removed from workspace '" + workspace.getName() + "'")
+                    .relatedId(workspaceId)
+                    .relatedType("WORKSPACE")
+                    .build();
+            rabbitTemplate.convertAndSend(
+                    RabbitMQConfig.NOTIFICATION_EXCHANGE,
+                    RabbitMQConfig.NOTIFICATION_ROUTING_KEY,
+                    notification
+            );
+        } catch (Exception e) {
+            log.error("Failed to send notification for removing member", e);
+        }
     }
 
     // Update member role

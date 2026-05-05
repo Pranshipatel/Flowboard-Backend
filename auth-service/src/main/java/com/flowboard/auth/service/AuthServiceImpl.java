@@ -262,7 +262,7 @@ public class AuthServiceImpl implements AuthService {
     // ================= SEARCH =================
     @Override
     public List<User> searchUsers(String key) {
-        return repository.searchByNameOrUsername(key);
+        return repository.searchUsers(key);
     }
 
     // ================= ADMIN =================
@@ -274,6 +274,19 @@ public class AuthServiceImpl implements AuthService {
     @Override
     public List<User> getUsersByRole(ROLE role){
         return repository.findAllByRole(role);
+    }
+
+    @Override
+    public void updateUserRole(Long userId, String role) {
+        User user = getUserById(userId);
+        try {
+            ROLE newRole = ROLE.valueOf(role.toUpperCase());
+            user.setRole(newRole);
+            repository.save(user);
+            log.info("User role updated to {} for userId={}", newRole, userId);
+        } catch (IllegalArgumentException e) {
+            throw new CustomException("Invalid role: " + role, HttpStatus.BAD_REQUEST);
+        }
     }
 
     @Override

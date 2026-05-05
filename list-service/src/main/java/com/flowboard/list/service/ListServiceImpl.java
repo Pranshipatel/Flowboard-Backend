@@ -1,7 +1,5 @@
 package com.flowboard.list.service;
 
-import org.springframework.stereotype.Service;
-
 import com.flowboard.list.dto.CreateListRequest;
 import com.flowboard.list.dto.ListResponse;
 import com.flowboard.list.dto.MoveListRequest;
@@ -26,13 +24,22 @@ import java.util.concurrent.atomic.AtomicInteger;
 @Slf4j
 public class ListServiceImpl implements ListService {
 
+    private static final long FREE_LIST_LIMIT = 2;
+
     private final ListRepository listRepository;
 
     // ================= CREATE =================
 
     @Override
     @Transactional
-    public ListResponse createList(CreateListRequest request, Long userId) {
+    public ListResponse createList(CreateListRequest request, Long userId, boolean premium) {
+
+        if (!premium && listRepository.countByBoardIdAndIsArchivedFalse(request.getBoardId()) >= FREE_LIST_LIMIT) {
+            throw new CustomException(
+                    "Free users can create up to 2 lists per board. Upgrade to premium for unlimited lists.",
+                    HttpStatus.FORBIDDEN
+            );
+        }
 
         int position;
 

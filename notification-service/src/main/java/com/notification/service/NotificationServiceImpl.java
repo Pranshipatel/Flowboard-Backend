@@ -178,47 +178,6 @@ public class NotificationServiceImpl implements NotificationService {
         log.info("Read notifications deleted for recipientId={}", recipientId);
     }
 
-    @Override
-    @Transactional
-    public void notifyAssignment(Long recipientId, Long actorId,
-                                 Long cardId, String cardTitle,
-                                 String recipientEmail) {
-
-        SendNotificationRequest req = new SendNotificationRequest();
-        req.setRecipientId(recipientId);
-        req.setActorId(actorId);
-        req.setType(NotificationType.ASSIGNMENT);
-        req.setTitle("Card assigned to you");
-        req.setMessage("You have been assigned to card: '" + cardTitle + "'");
-        req.setRelatedId(cardId);
-        req.setRelatedType("CARD");
-        req.setDeepLinkUrl("/cards/" + cardId);
-
-        // Assignment is considered critical → always send email
-        req.setSendEmail(true);
-        req.setRecipientEmail(recipientEmail);
-
-        send(req);
-    }
-
-    @Override
-    @Transactional
-    public void notifyMention(Long recipientId, Long actorId,
-                              Long cardId, String cardTitle) {
-
-        SendNotificationRequest req = new SendNotificationRequest();
-        req.setRecipientId(recipientId);
-        req.setActorId(actorId);
-        req.setType(NotificationType.MENTION);
-        req.setTitle("You were mentioned in a comment");
-        req.setMessage("Someone mentioned you in a comment on '" + cardTitle + "'");
-        req.setRelatedId(cardId);
-        req.setRelatedType("CARD");
-        req.setDeepLinkUrl("/cards/" + cardId);
-        req.setSendEmail(false);
-
-        send(req);
-    }
 
     @Override
     @Transactional
@@ -239,66 +198,6 @@ public class NotificationServiceImpl implements NotificationService {
         send(req);
     }
 
-    @Override
-    @Transactional
-    public void notifyCardMovedToDone(Long recipientId, Long actorId,
-                                      Long cardId, String cardTitle) {
-
-        SendNotificationRequest req = new SendNotificationRequest();
-        req.setRecipientId(recipientId);
-        req.setActorId(actorId);
-        req.setType(NotificationType.MOVE);
-        req.setTitle("Card moved to Done");
-        req.setMessage("Card '" + cardTitle + "' has been marked as Done.");
-        req.setRelatedId(cardId);
-        req.setRelatedType("CARD");
-        req.setDeepLinkUrl("/cards/" + cardId);
-        req.setSendEmail(false);
-
-        send(req);
-    }
-
-    @Override
-    @Transactional
-    public void notifyCommentReply(Long recipientId, Long actorId,
-                                   Long cardId, String cardTitle) {
-
-        SendNotificationRequest req = new SendNotificationRequest();
-        req.setRecipientId(recipientId);
-        req.setActorId(actorId);
-        req.setType(NotificationType.COMMENT);
-        req.setTitle("New reply on your comment");
-        req.setMessage("Someone replied to your comment on '" + cardTitle + "'");
-        req.setRelatedId(cardId);
-        req.setRelatedType("CARD");
-        req.setDeepLinkUrl("/cards/" + cardId);
-        req.setSendEmail(false);
-
-        send(req);
-    }
-
-    @Override
-    @Transactional
-    public void notifyOverdue(Long recipientId, Long cardId,
-                              String cardTitle, String dueDate,
-                              String recipientEmail) {
-
-        SendNotificationRequest req = new SendNotificationRequest();
-        req.setRecipientId(recipientId);
-        req.setActorId(null); // system-generated
-        req.setType(NotificationType.OVERDUE);
-        req.setTitle("Overdue card");
-        req.setMessage("Card '" + cardTitle + "' was due on " + dueDate + " and is not yet done.");
-        req.setRelatedId(cardId);
-        req.setRelatedType("CARD");
-        req.setDeepLinkUrl("/cards/" + cardId);
-
-        // Overdue is critical → always notify via email
-        req.setSendEmail(true);
-        req.setRecipientEmail(recipientEmail);
-
-        send(req);
-    }
 
     // Converts entity to response DTO
     private NotificationResponse toResponse(Notification n) {

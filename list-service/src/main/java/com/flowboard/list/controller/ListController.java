@@ -31,15 +31,21 @@ public class ListController {
         throw new CustomException("Missing required header: X-User-Id", HttpStatus.BAD_REQUEST);
     }
 
+    private boolean isPremium(String plan, String status) {
+        return "PREMIUM".equalsIgnoreCase(plan) && "ACTIVE".equalsIgnoreCase(status);
+    }
+
     // ================= CREATE =================
 
     @PostMapping
     public ResponseEntity<ListResponse> create(
             @Valid @RequestBody CreateListRequest request,
-            @RequestHeader(value = "X-User-Id", required = false) Long userId
+            @RequestHeader(value = "X-User-Id", required = false) Long userId,
+            @RequestHeader(value = "X-Subscription-Plan", required = false, defaultValue = "FREE") String plan,
+            @RequestHeader(value = "X-Subscription-Status", required = false, defaultValue = "EXPIRED") String status
     ) {
         return ResponseEntity.status(HttpStatus.CREATED)
-                .body(listService.createList(request, resolveUserId(userId)));
+                .body(listService.createList(request, resolveUserId(userId), isPremium(plan, status)));
     }
 
     // ================= READ =================
@@ -50,8 +56,16 @@ public class ListController {
     }
 
     @GetMapping("/board/{boardId}")
-    public ResponseEntity<List<ListResponse>> getByBoard(@PathVariable Long boardId) {
-        return ResponseEntity.ok(listService.getListsByBoard(boardId));
+    public ResponseEntity<List<ListResponse>> getByBoard(
+            @PathVariable Long boardId,
+            @RequestHeader(value = "X-Subscription-Plan", required = false, defaultValue = "FREE") String plan,
+            @RequestHeader(value = "X-Subscription-Status", required = false, defaultValue = "EXPIRED") String status
+    ) {
+        List<ListResponse> lists = listService.getListsByBoard(boardId);
+        if (!isPremium(plan, status)) {
+            lists = lists.stream().limit(2).toList();
+        }
+        return ResponseEntity.ok(lists);
     }
 
     @GetMapping("/board/{boardId}/archived")

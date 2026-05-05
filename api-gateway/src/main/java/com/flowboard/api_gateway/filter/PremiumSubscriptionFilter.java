@@ -60,13 +60,34 @@ public class PremiumSubscriptionFilter extends AbstractGatewayFilterFactory<Prem
                         boolean premiumActive =
                                 "PREMIUM".equalsIgnoreCase(plan) && "ACTIVE".equalsIgnoreCase(status);
 
-                        if (!premiumActive) {
+                        if (config.isRequirePremium() && !premiumActive) {
                             return reject(exchange, "Premium subscription required", HttpStatus.FORBIDDEN);
                         }
-                        return chain.filter(exchange);
+
+                        var request = exchange.getRequest().mutate()
+                                .header("X-Subscription-Plan", plan)
+                                .header("X-Subscription-Status", status)
+                                .build();
+                        return chain.filter(exchange.mutate().request(request).build());
                     })
-                    .onErrorResume(ex -> reject(exchange, "Unable to validate subscription", HttpStatus.SERVICE_UNAVAILABLE));
+                    .onErrorResume(ex -> {
+                        if (config.isRequirePremium()) {
+                            return reject(exchange, "Unable to validate subscription", HttpStatus.SERVICE_UNAVAILABLE);
+                        }
+
+                        log.warn("Unable to validate subscription. Continuing as FREE for path={}",
+                                exchange.getRequest().getURI().getPath(), ex);
+                        return chain.filter(withSubscriptionHeaders(exchange, "FREE", "EXPIRED"));
+                    });
         };
+    }
+
+    private ServerWebExchange withSubscriptionHeaders(ServerWebExchange exchange, String plan, String status) {
+        var request = exchange.getRequest().mutate()
+                .header("X-Subscription-Plan", plan)
+                .header("X-Subscription-Status", status)
+                .build();
+        return exchange.mutate().request(request).build();
     }
 
     private Mono<Void> reject(ServerWebExchange exchange, String message, HttpStatus status) {
@@ -82,5 +103,6 @@ public class PremiumSubscriptionFilter extends AbstractGatewayFilterFactory<Prem
     @Data
     public static class Config {
         private boolean enabled = true;
+        private boolean requirePremium = true;
     }
 }

@@ -13,7 +13,7 @@ import com.flowboard.list.dto.UpdateListRequest;
 public interface ListService {
 
     // ================= CREATE =================
-    ListResponse createList(CreateListRequest request, Long userId);
+    ListResponse createList(CreateListRequest request, Long userId, boolean premium);
 
 
     // ================= READ =================

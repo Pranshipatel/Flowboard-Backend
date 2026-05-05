@@ -8,9 +8,10 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
-import com.card.client.NotificationClient;
-import com.card.client.dto.NotifyDueDateRequest;
-import com.card.client.dto.NotifyOverdueRequest;
+import com.card.client.dto.SendNotificationRequest;
+import com.card.config.RabbitMQConfig;
+import org.springframework.amqp.rabbit.core.RabbitTemplate;
+
 import com.card.entity.Card;
 import com.card.entity.CardStatus;
 import com.card.repository.CardRepository;
@@ -25,7 +26,7 @@ import java.util.List;
 public class DueDateScheduler {
 
     private final CardRepository cardRepository;
-    private final NotificationClient notificationClient;
+    private final RabbitTemplate rabbitTemplate;
 
     @Scheduled(cron = "0 0 8 * * *")
     public void notifyDueTomorrow() {
@@ -49,14 +50,19 @@ public class DueDateScheduler {
             if (card.getAssigneeId() == null) continue;
 
             try {
-                notificationClient.notifyDueDate(
-                        new NotifyDueDateRequest(
-                                card.getAssigneeId(),
-                                card.getId(),
-                                card.getTitle(),
-                                "24 hours",
-                                null
-                        )
+                SendNotificationRequest notification = SendNotificationRequest.builder()
+                        .recipientId(card.getAssigneeId())
+                        .type("DUE_DATE")
+                        .title("Due Date Approaching: " + card.getTitle())
+                        .message("This card is due in 24 hours.")
+                        .relatedId(card.getId())
+                        .relatedType("CARD")
+                        .build();
+
+                rabbitTemplate.convertAndSend(
+                        RabbitMQConfig.NOTIFICATION_EXCHANGE,
+                        RabbitMQConfig.NOTIFICATION_ROUTING_KEY,
+                        notification
                 );
 
                 log.debug(
@@ -98,14 +104,19 @@ public class DueDateScheduler {
             if (card.getAssigneeId() == null) continue;
 
             try {
-                notificationClient.notifyDueDate(
-                        new NotifyDueDateRequest(
-                                card.getAssigneeId(),
-                                card.getId(),
-                                card.getTitle(),
-                                "2 hours",
-                                null
-                        )
+                SendNotificationRequest notification = SendNotificationRequest.builder()
+                        .recipientId(card.getAssigneeId())
+                        .type("DUE_DATE")
+                        .title("Urgent: " + card.getTitle())
+                        .message("This card is due in 2 hours.")
+                        .relatedId(card.getId())
+                        .relatedType("CARD")
+                        .build();
+
+                rabbitTemplate.convertAndSend(
+                        RabbitMQConfig.NOTIFICATION_EXCHANGE,
+                        RabbitMQConfig.NOTIFICATION_ROUTING_KEY,
+                        notification
                 );
 
             } catch (Exception e) {
@@ -118,49 +129,5 @@ public class DueDateScheduler {
         }
     }
 
-    @Scheduled(cron = "0 0 9 * * *")
-    public void notifyOverdueCards() {
 
-        LocalDate yesterday = LocalDate.now().minusDays(1);
-
-        List<Card> overdueCards = cardRepository
-                .findByDueDateAndIsArchivedFalseAndStatusNot(
-                        yesterday,
-                        CardStatus.DONE
-                );
-
-        log.info(
-                "[Schedular] Overdue check: {} cards overdue",
-                overdueCards.size()
-        );
-
-        for (Card card : overdueCards) {
-
-            if (card.getAssigneeId() == null) continue;
-
-            try {
-                notificationClient.notifyOverdue(
-                        new NotifyOverdueRequest(
-                                card.getAssigneeId(),
-                                card.getId(),
-                                card.getTitle(),
-                                card.getDueDate().toString(),
-                                null
-                        )
-                );
-
-                log.debug(
-                        "Overdue notification sent for cardId={}",
-                        card.getId()
-                );
-
-            } catch (Exception e) {
-                log.error(
-                        "Failed overdue notification cardId={}: {}",
-                        card.getId(),
-                        e.getMessage()
-                );
-            }
-        }
-    }
 }

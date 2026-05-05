@@ -1,8 +1,5 @@
 package com.flowboard.auth.entity;
 
-
-
-
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -15,17 +12,6 @@ import java.time.LocalDateTime;
 import java.util.Collection;
 import java.util.List;
 
-/**
- * User Entity
- *
- * Represents application users in the system.
- * Implements UserDetails to integrate with Spring Security.
- *
- * Responsibilities:
- * - Store user credentials and profile data
- * - Provide authentication details to Spring Security
- * - Define account status (active, locked, expired, etc.)
- */
 @Entity
 @Table(name = "users")
 @Data
@@ -34,9 +20,7 @@ import java.util.List;
 @AllArgsConstructor
 public class User implements UserDetails {
 
-    /**
-     * Primary Key (Auto-generated)
-     */
+ 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     public Long id;
@@ -59,9 +43,6 @@ public class User implements UserDetails {
     @Column(unique = true)
     private String username;
 
-    /**
-     * Encrypted password
-     */
     private String password;
 
     /**
@@ -102,10 +83,7 @@ public class User implements UserDetails {
      */
     private LocalDateTime createdAt;
 
-    /**
-     * Returns user authorities (roles/permissions)
-     * Spring Security uses this for authorization
-     */
+
     @Override
     public Collection<? extends GrantedAuthority> getAuthorities() {
 

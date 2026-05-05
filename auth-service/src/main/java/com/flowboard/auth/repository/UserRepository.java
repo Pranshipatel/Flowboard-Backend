@@ -71,9 +71,10 @@ public interface UserRepository extends JpaRepository<User, Long> {
      * @return list of matching users
      */
     @Query("SELECT u FROM User u WHERE " +
-            "LOWER(u.fullName) LIKE LOWER(CONCAT('%', :key, '%')) OR" +
-            " LOWER(u.username) LIKE LOWER(CONCAT('%', :key, '%'))")
-    List<User> searchByNameOrUsername(@Param("key") String key);
+            "LOWER(u.fullName) LIKE LOWER(CONCAT('%', :key, '%')) OR " +
+            "LOWER(u.username) LIKE LOWER(CONCAT('%', :key, '%')) OR " +
+            "LOWER(u.email) LIKE LOWER(CONCAT('%', :key, '%'))")
+    List<User> searchUsers(@Param("key") String key);
 
     /**
      * Delete user by ID

@@ -48,30 +48,7 @@ public class EmailNotificationService {
         }
     }
 
-    @Async
-    public void sendAssignmentEmail(String toEmail,
-                                   String cardTitle,
-                                   String assignedBy,
-                                   String deepLinkUrl) {
 
-        String title = "New assignment";
-        String message = assignedBy + " has assigned you to the card '" +
-                cardTitle + "'. Click below to view details.";
-
-        sendNotificationEmail(toEmail, title, message, deepLinkUrl);
-    }
-
-    @Async
-    public void sendOverdueEmail(String toEmail,
-                                String cardTitle,
-                                String dueDate) {
-
-        String title = "Overdue task reminder";
-        String message = "The card '" + cardTitle + "' was due on " + dueDate +
-                " and is still pending. Please take action.";
-
-        sendNotificationEmail(toEmail, title, message, null);
-    }
 
     private String buildEmailBody(String title, String message, String deepLinkUrl) {
 

@@ -46,20 +46,6 @@ public class NotificationController {
                 .body(notificationService.sendBulk(request));
     }
 
-    @PostMapping("/notify/assignment")
-    public ResponseEntity<String> notifyAssignment(
-            @RequestParam Long recipientId,
-            @RequestParam Long actorId,
-            @RequestParam Long cardId,
-            @RequestParam String cardTitle,
-            @RequestParam(required = false) String recipientEmail){
-
-        notificationService.notifyAssignment(
-                recipientId, actorId, cardId, cardTitle, recipientEmail);
-
-        return ResponseEntity.ok("Assignment notification sent successfully");
-    }
-
     // Handles due-date notification via request body (used by integrations)
     @PostMapping("/notify/due-date-body")
     public ResponseEntity<String> notifyDueDateBody(
@@ -74,89 +60,6 @@ public class NotificationController {
                 recipientId, cardId, cardTitle, timeLeft);
 
         return ResponseEntity.ok("Due date notification sent successfully");
-    }
-
-    @PostMapping("/notify/overdue-body")
-    public ResponseEntity<String> notifyOverdueBody(
-            @RequestBody Map<String, Object> req){
-
-        Long recipientId = Long.valueOf(req.get("recipientId").toString());
-        Long cardId = Long.valueOf(req.get("cardId").toString());
-        String cardTitle = req.get("cardTitle").toString();
-        String dueDate = req.get("dueDate").toString();
-
-        String email = req.containsKey("recipientEmail") && req.get("recipientEmail") != null
-                ? req.get("recipientEmail").toString() : null;
-
-        notificationService.notifyOverdue(
-                recipientId, cardId, cardTitle, dueDate, email);
-
-        return ResponseEntity.ok("Overdue notification sent successfully");
-    }
-
-    @PostMapping("/notify/mention")
-    public ResponseEntity<String> notifyMention(
-            @RequestParam Long recipientId,
-            @RequestParam Long actorId,
-            @RequestParam Long cardId,
-            @RequestParam String cardTitle){
-
-        notificationService.notifyMention(recipientId, actorId, cardId, cardTitle);
-
-        return ResponseEntity.ok("Mention notification sent successfully");
-    }
-
-    @PostMapping("/notify/due-date")
-    public ResponseEntity<String> notifyDueDate(
-            @RequestParam Long recipientId,
-            @RequestParam Long cardId,
-            @RequestParam String cardTitle,
-            @RequestParam String timeLeft){
-
-        notificationService.notifyDueDateApproaching(
-                recipientId, cardId, cardTitle, timeLeft);
-
-        return ResponseEntity.ok("Due date notification sent successfully");
-    }
-
-    @PostMapping("/notify/done")
-    public ResponseEntity<String> notifyDone(
-            @RequestParam Long recipientId,
-            @RequestParam Long actorId,
-            @RequestParam Long cardId,
-            @RequestParam String cardTitle){
-
-        notificationService.notifyCardMovedToDone(
-                recipientId, actorId, cardId, cardTitle);
-
-        return ResponseEntity.ok("Completion notification sent successfully");
-    }
-
-    @PostMapping("/notify/reply")
-    public ResponseEntity<String> notifyReply(
-            @RequestParam Long recipientId,
-            @RequestParam Long actorId,
-            @RequestParam Long cardId,
-            @RequestParam String cardTitle){
-
-        notificationService.notifyCommentReply(
-                recipientId, actorId, cardId, cardTitle);
-
-        return ResponseEntity.ok("Reply notification sent successfully");
-    }
-
-    @PostMapping("/notify/overdue")
-    public ResponseEntity<String> notifyOverdue(
-            @RequestParam Long recipientId,
-            @RequestParam Long cardId,
-            @RequestParam String cardTitle,
-            @RequestParam String dueDate,
-            @RequestParam(required = false) String recipientEmail){
-
-        notificationService.notifyOverdue(
-                recipientId, cardId, cardTitle, dueDate, recipientEmail);
-
-        return ResponseEntity.ok("Overdue notification sent successfully");
     }
 
     // ================= RETRIEVAL =================

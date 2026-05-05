@@ -13,8 +13,20 @@ import com.flowboard.board.entity.BoardMemberRole;
 import com.flowboard.board.entity.Visibility;
 import com.flowboard.board.exception.CustomException;
 import com.flowboard.board.repository.BoardMemberRepository;
-import com.flowboard.board.repository.BoardRepository;
+import com.flowboard.board.client.WorkspaceClient;
+import com.flowboard.board.client.CardClient;
+import com.flowboard.board.client.CardClient.BoardStatsResponse;
+import com.flowboard.board.dto.WorkspaceResponse;
+import com.flowboard.board.dto.WorkspaceMemberResponse;
+import com.flowboard.board.dto.SendNotificationRequest;
+import com.flowboard.board.dto.PublicBoardDetailResponse;
+import com.flowboard.board.dto.PublicCardClientResponse;
+import com.flowboard.board.dto.PublicListClientResponse;
+import org.springframework.amqp.rabbit.core.RabbitTemplate;
+import com.flowboard.board.config.RabbitMQConfig;
 
+import java.util.Map;
+import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import lombok.RequiredArgsConstructor;
@@ -25,6 +37,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import com.flowboard.board.client.ListClient;
 
 
 @Service
@@ -32,23 +45,47 @@ import java.util.List;
 @Slf4j
 public class BoardServiceImpl implements BoardService {
 
-    private final BoardRepository boardRepository;
+    private static final long FREE_BOARD_LIMIT = 2;
+
+    private final com.flowboard.board.repository.BoardRepository boardRepository;
     private final BoardMemberRepository memberRepository;
+    private final WorkspaceClient workspaceClient;
+    private final CardClient cardClient;
+    private final ListClient listClient;
+    private final RabbitTemplate rabbitTemplate;
 
     // ===== Board CRUD =====
 
     @Override
     @Transactional
-    public BoardResponse createBoard(CreateBoardRequest request, Long createdById) {
+    public BoardResponse createBoard(CreateBoardRequest request, Long createdById, boolean premium) {
+
+        WorkspaceResponse workspace = workspaceClient.getWorkspaceById(request.getWorkspaceId(), createdById);
+        if (!workspace.getOwnerId().equals(createdById)) {
+            throw new CustomException("Only the owner of the workspace can create a board", HttpStatus.FORBIDDEN);
+        }
+
+        if (!premium && boardRepository.countByWorkspaceId(request.getWorkspaceId()) >= FREE_BOARD_LIMIT) {
+            throw new CustomException(
+                    "Free users can create up to 2 boards per workspace. Upgrade to premium for unlimited boards.",
+                    HttpStatus.FORBIDDEN
+            );
+        }
+
+        Visibility boardVisibility = isPublicWorkspace(workspace)
+                ? (request.getVisibility() != null ? request.getVisibility() : Visibility.PRIVATE)
+                : Visibility.PRIVATE;
 
         Board board = Board.builder()
                 .workspaceId(request.getWorkspaceId())
                 .name(request.getName())
                 .description(request.getDescription())
                 .background(request.getBackground())
-                .visibility(request.getVisibility() != null ? request.getVisibility() : Visibility.PRIVATE)
+                .visibility(boardVisibility)
                 .createdById(createdById)
                 .isClosed(false)
+                .dueDate(request.getDueDate())
+                .priority(request.getPriority())
                 .createdAt(LocalDateTime.now())
                 .build();
 
@@ -67,53 +104,137 @@ public class BoardServiceImpl implements BoardService {
         log.info("Board created: id={} name={} workspaceId={} createdBy={}",
                 board.getId(), board.getName(), board.getWorkspaceId(), createdById);
 
+        // Create Default Lists
+        try {
+            String[] defaultLists = premium
+                    ? new String[] {"To Do", "In Progress", "In Review", "Done"}
+                    : new String[] {"To Do", "In Progress"};
+            for (int i = 0; i < defaultLists.length; i++) {
+                listClient.createList(
+                        java.util.Map.of(
+                                "boardId", board.getId(),
+                                "name", defaultLists[i],
+                                "position", i
+                        ),
+                        createdById,
+                        premium ? "PREMIUM" : "FREE",
+                        premium ? "ACTIVE" : "EXPIRED"
+                );
+            }
+        } catch (Exception e) {
+            log.error("Failed to create default lists for board id={}", board.getId(), e);
+        }
+
+        // Notify workspace members
+        try {
+            List<WorkspaceMemberResponse> members = workspaceClient.getMembers(request.getWorkspaceId(), createdById);
+            for (WorkspaceMemberResponse member : members) {
+                if (!member.getUserId().equals(createdById)) {
+                    SendNotificationRequest notification = SendNotificationRequest.builder()
+                            .recipientId(member.getUserId())
+                            .actorId(createdById)
+                            .type("ASSIGNMENT")
+                            .title("New Task Created")
+                            .message("The task '" + board.getName() + "' has been created in workspace '" + workspace.getName() + "'.")
+                            .relatedId(board.getId())
+                            .relatedType("BOARD")
+                            .deepLinkUrl("/b/" + board.getId())
+                            .sendEmail(false)
+                            .build();
+
+                    rabbitTemplate.convertAndSend(
+                            RabbitMQConfig.NOTIFICATION_EXCHANGE,
+                            RabbitMQConfig.NOTIFICATION_ROUTING_KEY,
+                            notification
+                    );
+                }
+            }
+        } catch (Exception e) {
+            log.error("Failed to send board creation notifications", e);
+        }
+
         return toResponse(board);
     }
 
     @Override
     public BoardResponse getBoardById(Long boardId, Long requesterId) {
         Board board = findBoard(boardId);
-        // Any authenticated workspace user can view any board.
-        // (Workspace-level auth already verified via X-User-Id header at gateway.)
+        WorkspaceResponse workspace = workspaceClient.getWorkspaceById(board.getWorkspaceId(), requesterId);
+        if (board.getVisibility() == Visibility.PRIVATE && !isWorkspaceParticipant(workspace, requesterId)) {
+            throw new CustomException("Access denied. This board is private", HttpStatus.FORBIDDEN);
+        }
         return toResponse(board);
     }
 
     @Override
-    public List<BoardResponse> getBoardsByWorkspace(Long workspaceId, Long requesterId) {
-        // Return ALL boards in the workspace. Workspace-level auth (X-User-Id header)
-        // already guarantees the requester is an authenticated user.
-        // Board-level privacy (PRIVATE visibility) is enforced only on getById.
-        return boardRepository.findByWorkspaceId(workspaceId)
-                .stream()
-                .map(this::toResponse)
-                .toList();
+    public List<BoardResponse> getBoardsByWorkspace(Long workspaceId, Long requesterId, boolean premium) {
+        WorkspaceResponse workspace = workspaceClient.getWorkspaceById(workspaceId, requesterId);
+        boolean participant = isWorkspaceParticipant(workspace, requesterId);
+
+        List<Board> boards = boardRepository.findByWorkspaceId(workspaceId);
+        if (!participant) {
+            boards = boards.stream()
+                    .filter(board -> board.getVisibility() == Visibility.PUBLIC)
+                    .toList();
+        }
+
+        if (!premium) {
+            boards = boards.stream().limit(FREE_BOARD_LIMIT).toList();
+        }
+        return toResponses(boards);
     }
 
     @Override
     public List<BoardResponse> getBoardsByMember(Long userId) {
-        return boardRepository.findByMemberUserId(userId)
-                .stream().map(this::toResponse).toList();
+        return toResponses(boardRepository.findByMemberUserId(userId));
     }
 
     @Override
     public List<BoardResponse> getBoardsByCreator(Long createdById) {
-        return boardRepository.findByCreatedById(createdById)
-                .stream().map(this::toResponse).toList();
+        return toResponses(boardRepository.findByCreatedById(createdById));
     }
 
     @Override
     public List<BoardResponse> getPublicBoards() {
-        return boardRepository.findByVisibility(Visibility.PUBLIC)
-                .stream().map(this::toResponse).toList();
+        return toResponses(boardRepository.findByVisibility(Visibility.PUBLIC));
+    }
+
+    @Override
+    public PublicBoardDetailResponse getPublicBoardDetail(Long boardId) {
+        Board board = findBoard(boardId);
+        if (board.getVisibility() != Visibility.PUBLIC || board.isClosed()) {
+            throw new CustomException("Board is not publicly available", HttpStatus.FORBIDDEN);
+        }
+
+        WorkspaceResponse workspace = workspaceClient.getPublicWorkspaceById(board.getWorkspaceId());
+        if (!isPublicWorkspace(workspace)) {
+            throw new CustomException("Workspace is private", HttpStatus.FORBIDDEN);
+        }
+
+        return toPublicDetailResponse(board);
+    }
+
+    @Override
+    public List<PublicBoardDetailResponse> getPublicBoardDetailsByWorkspace(Long workspaceId) {
+        WorkspaceResponse workspace = workspaceClient.getPublicWorkspaceById(workspaceId);
+        if (workspace.getVisibility() == null || !"PUBLIC".equalsIgnoreCase(workspace.getVisibility().toString())) {
+            throw new CustomException("Workspace is private", HttpStatus.FORBIDDEN);
+        }
+
+        return boardRepository.findByWorkspaceId(workspaceId)
+                .stream()
+                .filter(board -> board.getVisibility() == Visibility.PUBLIC && !board.isClosed())
+                .map(this::toPublicDetailResponse)
+                .toList();
     }
 
     @Override
     public List<BoardResponse> getClosedBoards(Long workspaceId, Long requesterId) {
-        return boardRepository.findByWorkspaceIdAndIsClosed(workspaceId, true)
+        List<Board> boards = boardRepository.findByWorkspaceIdAndIsClosed(workspaceId, true)
                 .stream()
                 .filter(b -> memberRepository.existsByBoardIdAndUserId(b.getId(), requesterId))
-                .map(this::toResponse)
                 .toList();
+        return toResponses(boards);
     }
 
     @Override
@@ -130,7 +251,10 @@ public class BoardServiceImpl implements BoardService {
         board.setName(request.getName());
         board.setDescription(request.getDescription());
         if (request.getBackground() != null) board.setBackground(request.getBackground());
-        if (request.getVisibility() != null) board.setVisibility(request.getVisibility());
+        if (request.getVisibility() != null) {
+            WorkspaceResponse workspace = workspaceClient.getWorkspaceById(board.getWorkspaceId(), requesterId);
+            board.setVisibility(isPublicWorkspace(workspace) ? request.getVisibility() : Visibility.PRIVATE);
+        }
         board.setUpdatedAt(LocalDateTime.now());
 
         boardRepository.save(board);
@@ -180,13 +304,48 @@ public class BoardServiceImpl implements BoardService {
     public void deleteBoard(Long boardId, Long requesterId) {
         Board board = findBoard(boardId);
 
-        if (!board.getCreatedById().equals(requesterId)) {
-            throw new CustomException("Only the creator can delete this board",
+        boolean isCreator = board.getCreatedById().equals(requesterId);
+        boolean isAdmin = false;
+        
+        if (!isCreator) {
+            BoardMember member = memberRepository.findByBoardIdAndUserId(boardId, requesterId).orElse(null);
+            isAdmin = member != null && member.getRole() == BoardMemberRole.ADMIN;
+        }
+
+        if (!isCreator && !isAdmin) {
+            throw new CustomException("Only the creator or an admin can delete this board",
                     HttpStatus.FORBIDDEN);
         }
 
         boardRepository.delete(board);
         log.info("Board deleted: id={} by userId={}", boardId, requesterId);
+
+        // Notify workspace members
+        try {
+            WorkspaceResponse workspace = workspaceClient.getWorkspaceById(board.getWorkspaceId(), requesterId);
+            List<WorkspaceMemberResponse> members = workspaceClient.getMembers(board.getWorkspaceId(), requesterId);
+            for (WorkspaceMemberResponse member : members) {
+                if (!member.getUserId().equals(requesterId)) {
+                    SendNotificationRequest notification = SendNotificationRequest.builder()
+                            .recipientId(member.getUserId())
+                            .actorId(requesterId)
+                            .type("BROADCAST")
+                            .title("Task Deleted")
+                            .message("The task '" + board.getName() + "' has been deleted from workspace '" + workspace.getName() + "'.")
+                            .relatedId(board.getWorkspaceId())
+                            .relatedType("WORKSPACE")
+                            .build();
+
+                    rabbitTemplate.convertAndSend(
+                            RabbitMQConfig.NOTIFICATION_EXCHANGE,
+                            RabbitMQConfig.NOTIFICATION_ROUTING_KEY,
+                            notification
+                    );
+                }
+            }
+        } catch (Exception e) {
+            log.error("Failed to send board deletion notifications", e);
+        }
     }
 
     // ===== Member Management =====
@@ -291,6 +450,24 @@ public class BoardServiceImpl implements BoardService {
                         "Board not found", HttpStatus.NOT_FOUND));
     }
 
+    private boolean isPublicWorkspace(WorkspaceResponse workspace) {
+        return workspace.getVisibility() != null && "PUBLIC".equalsIgnoreCase(workspace.getVisibility());
+    }
+
+    private boolean isWorkspaceParticipant(WorkspaceResponse workspace, Long userId) {
+        if (workspace.getOwnerId() != null && workspace.getOwnerId().equals(userId)) {
+            return true;
+        }
+
+        try {
+            return workspaceClient.getMembers(workspace.getId(), userId)
+                    .stream()
+                    .anyMatch(member -> member.getUserId().equals(userId));
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
     private void requireMember(Long boardId, Long userId) {
         if (!memberRepository.existsByBoardIdAndUserId(boardId, userId)) {
             throw new CustomException(
@@ -312,7 +489,34 @@ public class BoardServiceImpl implements BoardService {
         }
     }
 
+    private List<BoardResponse> toResponses(List<Board> boards) {
+        if (boards.isEmpty()) return List.of();
+        List<Long> boardIds = boards.stream().map(Board::getId).toList();
+        
+        Map<Long, BoardStatsResponse> tempMap;
+        try {
+            List<BoardStatsResponse> stats = cardClient.getBoardStats(boardIds);
+            tempMap = stats.stream().collect(Collectors.toMap(BoardStatsResponse::boardId, s -> s));
+        } catch (Exception e) {
+            log.error("Failed to fetch board stats from card-service", e);
+            tempMap = Map.of();
+        }
+
+        final Map<Long, BoardStatsResponse> finalStatsMap = tempMap;
+
+        return boards.stream().map(board -> {
+            BoardStatsResponse stat = finalStatsMap.get(board.getId());
+            long total = stat != null ? stat.totalCards() : 0;
+            long done = stat != null ? stat.doneCards() : 0;
+            return toResponse(board, total, done);
+        }).toList();
+    }
+
     private BoardResponse toResponse(Board board) {
+        return toResponse(board, 0, 0);
+    }
+
+    private BoardResponse toResponse(Board board, long totalCards, long doneCards) {
         List<BoardMember> members = memberRepository.findByBoardId(board.getId());
 
         List<BoardResponse.MemberDTO> memberDtos = members.stream()
@@ -330,6 +534,8 @@ public class BoardServiceImpl implements BoardService {
                 .adminCount(members.stream().filter(m -> m.getRole() == BoardMemberRole.ADMIN).count())
                 .build();
 
+        int progressPercentage = totalCards > 0 ? (int) ((doneCards * 100) / totalCards) : 0;
+
         return BoardResponse.builder()
                 .id(board.getId())
                 .workspaceId(board.getWorkspaceId())
@@ -341,9 +547,59 @@ public class BoardServiceImpl implements BoardService {
                 .isClosed(board.isClosed())
                 .createdAt(board.getCreatedAt())
                 .updatedAt(board.getUpdatedAt())
+                .dueDate(board.getDueDate())
+                .priority(board.getPriority())
                 .memberCount(members.size())
                 .members(memberDtos)
                 .analytics(analytics)
+                .totalCards(totalCards)
+                .doneCards(doneCards)
+                .progressPercentage(progressPercentage)
+                .build();
+    }
+
+    private PublicBoardDetailResponse toPublicDetailResponse(Board board) {
+        List<PublicCardClientResponse> cards = cardClient.getByBoard(board.getId(), "PREMIUM", "ACTIVE");
+        List<PublicListClientResponse> lists = listClient.getByBoard(board.getId(), "PREMIUM", "ACTIVE");
+
+        return PublicBoardDetailResponse.builder()
+                .id(board.getId())
+                .workspaceId(board.getWorkspaceId())
+                .name(board.getName())
+                .description(board.getDescription())
+                .background(board.getBackground())
+                .visibility(board.getVisibility())
+                .isClosed(board.isClosed())
+                .createdAt(board.getCreatedAt())
+                .updatedAt(board.getUpdatedAt())
+                .dueDate(board.getDueDate())
+                .priority(board.getPriority())
+                .lists(lists.stream()
+                        .map(list -> PublicBoardDetailResponse.PublicListDto.builder()
+                                .id(list.getId())
+                                .boardId(list.getBoardId())
+                                .name(list.getName())
+                                .position(list.getPosition())
+                                .color(list.getColor())
+                                .cards(cards.stream()
+                                        .filter(card -> list.getId().equals(card.getListId()))
+                                        .map(card -> PublicBoardDetailResponse.PublicCardDto.builder()
+                                                .id(card.getId())
+                                                .listId(card.getListId())
+                                                .boardId(card.getBoardId())
+                                                .title(card.getTitle())
+                                                .description(card.getDescription())
+                                                .position(card.getPosition())
+                                                .priority(card.getPriority())
+                                                .status(card.getStatus())
+                                                .startDate(card.getStartDate())
+                                                .dueDate(card.getDueDate())
+                                                .isOverdue(card.isOverdue())
+                                                .coverColor(card.getCoverColor())
+                                                .build())
+                                        .toList())
+                                .build())
+                        .toList())
                 .build();
     }
 }

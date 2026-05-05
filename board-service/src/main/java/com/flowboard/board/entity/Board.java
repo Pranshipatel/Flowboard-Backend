@@ -47,6 +47,11 @@ public class Board {
 
     private LocalDateTime updatedAt;
 
+    private LocalDateTime dueDate;
+
+    @Enumerated(EnumType.STRING)
+    private BoardPriority priority;
+
     @OneToMany(mappedBy = "board", cascade = CascadeType.ALL, orphanRemoval = true)
     @Builder.Default
     private List<BoardMember> members = new ArrayList<>();

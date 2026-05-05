@@ -41,13 +41,19 @@ public class CardController {
         );
     }
 
+    private boolean isPremium(String plan, String status) {
+        return "PREMIUM".equalsIgnoreCase(plan) && "ACTIVE".equalsIgnoreCase(status);
+    }
+
     @PostMapping
     public ResponseEntity<CardResponse> create(
             @Valid @RequestBody CreateCardRequest request,
-            @RequestHeader(value = "X-User-Id", required = false) Long userId
+            @RequestHeader(value = "X-User-Id", required = false) Long userId,
+            @RequestHeader(value = "X-Subscription-Plan", required = false, defaultValue = "FREE") String plan,
+            @RequestHeader(value = "X-Subscription-Status", required = false, defaultValue = "EXPIRED") String status
     ) {
         return ResponseEntity.status(HttpStatus.CREATED)
-                .body(cardService.createCard(request, resolveUserId(userId)));
+                .body(cardService.createCard(request, resolveUserId(userId), isPremium(plan, status)));
     }
 
     @GetMapping("/{id}")
@@ -57,16 +63,28 @@ public class CardController {
 
     @GetMapping("/list/{listId}")
     public ResponseEntity<List<CardResponse>> getByList(
-            @PathVariable Long listId
+            @PathVariable Long listId,
+            @RequestHeader(value = "X-Subscription-Plan", required = false, defaultValue = "FREE") String plan,
+            @RequestHeader(value = "X-Subscription-Status", required = false, defaultValue = "EXPIRED") String status
     ) {
-        return ResponseEntity.ok(cardService.getCardByList(listId));
+        List<CardResponse> cards = cardService.getCardByList(listId);
+        if (!isPremium(plan, status)) {
+            cards = cards.stream().limit(2).toList();
+        }
+        return ResponseEntity.ok(cards);
     }
 
     @GetMapping("/board/{boardId}")
     public ResponseEntity<List<CardResponse>> getByBoard(
-            @PathVariable Long boardId
+            @PathVariable Long boardId,
+            @RequestHeader(value = "X-Subscription-Plan", required = false, defaultValue = "FREE") String plan,
+            @RequestHeader(value = "X-Subscription-Status", required = false, defaultValue = "EXPIRED") String status
     ) {
-        return ResponseEntity.ok(cardService.getCardByBoard(boardId));
+        List<CardResponse> cards = cardService.getCardByBoard(boardId);
+        if (!isPremium(plan, status)) {
+            cards = cards.stream().limit(2).toList();
+        }
+        return ResponseEntity.ok(cards);
     }
 
     @GetMapping("/assignee/{userId}")
@@ -248,5 +266,12 @@ public class CardController {
             @PathVariable Long id
     ) {
         return ResponseEntity.ok(cardService.getCardActivity(id));
+    }
+
+    @PostMapping("/stats")
+    public ResponseEntity<List<com.card.dto.BoardStatsResponse>> getBoardStats(
+            @RequestBody List<Long> boardIds
+    ) {
+        return ResponseEntity.ok(cardService.getBoardStats(boardIds));
     }
 }
