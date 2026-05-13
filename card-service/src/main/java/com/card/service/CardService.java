@@ -4,6 +4,7 @@ package com.card.service;
 import com.card.dto.*;
 import com.card.entity.CardStatus;
 import com.card.entity.Priority;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
 
@@ -50,6 +51,11 @@ public interface CardService {
 
     // Activity
     List<CardActivityResponse> getCardActivity(Long cardId);
+
+    // Attachments
+    CardAttachmentResponse uploadAttachment(Long cardId, MultipartFile file, Long userId);
+    List<CardAttachmentResponse> getAttachments(Long cardId);
+    void deleteAttachment(Long cardId, Long attachmentId, Long userId);
 
     // Board Stats
     List<BoardStatsResponse> getBoardStats(List<Long> boardIds);

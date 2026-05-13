@@ -2,21 +2,28 @@ package com.card.service;
 
 
 
+import com.cloudinary.Cloudinary;
+import com.cloudinary.utils.ObjectUtils;
 import com.card.dto.*;
 import com.card.entity.*;
 
 import com.card.exception.CustomException;
 import com.card.repository.CardActivityRepository;
+import com.card.repository.CardAttachmentRepository;
 import com.card.repository.CardRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartFile;
 
+import java.io.IOException;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
 
 @Service
@@ -25,9 +32,24 @@ import java.util.concurrent.atomic.AtomicInteger;
 public class CardServiceImpl implements CardService{
 
     private static final long FREE_CARD_LIMIT = 2;
+    private static final long MAX_ATTACHMENT_BYTES = 20 * 1024 * 1024;
+    private static final Set<String> ALLOWED_CONTENT_TYPES = Set.of(
+            "application/pdf",
+            "application/vnd.ms-excel",
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            "application/msword",
+            "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            "text/plain",
+            "text/csv",
+            "image/png",
+            "image/jpeg",
+            "image/webp"
+    );
 
     private final CardRepository cardRepository;
     private final CardActivityRepository activityRepository;
+    private final CardAttachmentRepository attachmentRepository;
+    private final Cloudinary cloudinary;
 
     @Override
     @Transactional
@@ -173,6 +195,9 @@ public class CardServiceImpl implements CardService{
                 cardRepository.shiftPositionsLeft(card.getListId(), card.getPosition());
             }
 
+            attachmentRepository.findByCardIdOrderByCreatedAtDesc(cardId)
+                    .forEach(this::deleteFromCloudinaryQuietly);
+            attachmentRepository.deleteByCardId(cardId);
             cardRepository.delete(card);
             log.info("Card deleted: id={} by userId={}", cardId, userId);
     }
@@ -457,6 +482,72 @@ public class CardServiceImpl implements CardService{
                 .toList();
     }
 
+    @Override
+    @Transactional
+    public CardAttachmentResponse uploadAttachment(Long cardId, MultipartFile file, Long userId) {
+        Card card = findCard(cardId);
+        if (card.isArchived()) {
+            throw new CustomException("Cannot attach files to an archived card", HttpStatus.BAD_REQUEST);
+        }
+        validateAttachment(file);
+
+        try {
+            Map<?, ?> upload = cloudinary.uploader().upload(file.getBytes(), ObjectUtils.asMap(
+                    "resource_type", "auto",
+                    "folder", "flowboard/cards/" + cardId,
+                    "use_filename", true,
+                    "unique_filename", true
+            ));
+
+            Object resourceType = upload.get("resource_type");
+            CardAttachment attachment = CardAttachment.builder()
+                    .cardId(cardId)
+                    .uploadedById(userId)
+                    .fileName(safeOriginalFileName(file))
+                    .contentType(file.getContentType())
+                    .sizeBytes(file.getSize())
+                    .url(String.valueOf(upload.get("secure_url")))
+                    .publicId(String.valueOf(upload.get("public_id")))
+                    .resourceType(resourceType != null ? String.valueOf(resourceType) : "raw")
+                    .createdAt(LocalDateTime.now())
+                    .build();
+
+            attachmentRepository.save(attachment);
+            logActivity(cardId, userId, "ATTACHMENT_ADD",
+                    "attached file '" + attachment.getFileName() + "'",
+                    null, attachment.getFileName());
+            return toAttachmentResponse(attachment);
+        } catch (IOException | RuntimeException e) {
+            throw new CustomException("Failed to upload attachment", HttpStatus.BAD_REQUEST);
+        }
+    }
+
+    @Override
+    public List<CardAttachmentResponse> getAttachments(Long cardId) {
+        findCard(cardId);
+        return attachmentRepository.findByCardIdOrderByCreatedAtDesc(cardId)
+                .stream()
+                .map(this::toAttachmentResponse)
+                .toList();
+    }
+
+    @Override
+    @Transactional
+    public void deleteAttachment(Long cardId, Long attachmentId, Long userId) {
+        findCard(cardId);
+        CardAttachment attachment = attachmentRepository.findById(attachmentId)
+                .orElseThrow(() -> new CustomException("Attachment not found", HttpStatus.NOT_FOUND));
+        if (!attachment.getCardId().equals(cardId)) {
+            throw new CustomException("Attachment does not belong to this card", HttpStatus.BAD_REQUEST);
+        }
+
+        deleteFromCloudinaryQuietly(attachment);
+        attachmentRepository.delete(attachment);
+        logActivity(cardId, userId, "ATTACHMENT_DELETE",
+                "removed file '" + attachment.getFileName() + "'",
+                attachment.getFileName(), null);
+    }
+
     private Card findCard(Long cardId){
         return cardRepository.findById(cardId)
                 .orElseThrow(()-> new CustomException("Card not found", HttpStatus.NOT_FOUND));
@@ -497,6 +588,24 @@ public class CardServiceImpl implements CardService{
                 .coverColor(card.getCoverColor())
                 .createdAt(card.getCreatedAt())
                 .updatedAt(card.getUpdatedAt())
+                .attachments(attachmentRepository.findByCardIdOrderByCreatedAtDesc(card.getId())
+                        .stream()
+                        .map(this::toAttachmentResponse)
+                        .toList())
+                .build();
+    }
+
+    private CardAttachmentResponse toAttachmentResponse(CardAttachment a) {
+        return CardAttachmentResponse.builder()
+                .id(a.getId())
+                .cardId(a.getCardId())
+                .uploadedById(a.getUploadedById())
+                .fileName(a.getFileName())
+                .contentType(a.getContentType())
+                .sizeBytes(a.getSizeBytes())
+                .url(a.getUrl())
+                .resourceType(a.getResourceType())
+                .createdAt(a.getCreatedAt())
                 .build();
     }
 
@@ -511,6 +620,38 @@ public class CardServiceImpl implements CardService{
                 .newValue(a.getNewValue())
                 .createdAt(a.getCreatedAt())
                 .build();
+    }
+
+    private void validateAttachment(MultipartFile file) {
+        if (file == null || file.isEmpty()) {
+            throw new CustomException("Please choose a file to upload", HttpStatus.BAD_REQUEST);
+        }
+        if (file.getSize() > MAX_ATTACHMENT_BYTES) {
+            throw new CustomException("File size must be 20MB or less", HttpStatus.BAD_REQUEST);
+        }
+        String contentType = file.getContentType();
+        if (contentType == null || !ALLOWED_CONTENT_TYPES.contains(contentType)) {
+            throw new CustomException("Unsupported file type", HttpStatus.BAD_REQUEST);
+        }
+    }
+
+    private String safeOriginalFileName(MultipartFile file) {
+        String fileName = file.getOriginalFilename();
+        if (fileName == null || fileName.isBlank()) {
+            return "attachment";
+        }
+        return fileName.replace("\\", "_").replace("/", "_");
+    }
+
+    private void deleteFromCloudinaryQuietly(CardAttachment attachment) {
+        try {
+            cloudinary.uploader().destroy(attachment.getPublicId(), ObjectUtils.asMap(
+                    "resource_type", attachment.getResourceType()
+            ));
+        } catch (IOException | RuntimeException e) {
+            log.warn("Could not delete attachment from Cloudinary: id={} publicId={}",
+                    attachment.getId(), attachment.getPublicId());
+        }
     }
 
     @Override

@@ -7,8 +7,10 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
 import com.card.dto.AssignCardRequest;
+import com.card.dto.CardAttachmentResponse;
 import com.card.dto.CardActivityResponse;
 import com.card.dto.CardResponse;
 import com.card.dto.CreateCardRequest;
@@ -266,6 +268,33 @@ public class CardController {
             @PathVariable Long id
     ) {
         return ResponseEntity.ok(cardService.getCardActivity(id));
+    }
+
+    @PostMapping("/{id}/attachments")
+    public ResponseEntity<CardAttachmentResponse> uploadAttachment(
+            @PathVariable Long id,
+            @RequestParam("file") MultipartFile file,
+            @RequestHeader(value = "X-User-Id", required = false) Long userId
+    ) {
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(cardService.uploadAttachment(id, file, resolveUserId(userId)));
+    }
+
+    @GetMapping("/{id}/attachments")
+    public ResponseEntity<List<CardAttachmentResponse>> getAttachments(
+            @PathVariable Long id
+    ) {
+        return ResponseEntity.ok(cardService.getAttachments(id));
+    }
+
+    @DeleteMapping("/{id}/attachments/{attachmentId}")
+    public ResponseEntity<String> deleteAttachment(
+            @PathVariable Long id,
+            @PathVariable Long attachmentId,
+            @RequestHeader(value = "X-User-Id", required = false) Long userId
+    ) {
+        cardService.deleteAttachment(id, attachmentId, resolveUserId(userId));
+        return ResponseEntity.ok("Attachment deleted successfully");
     }
 
     @PostMapping("/stats")
