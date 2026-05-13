@@ -1,43 +1,37 @@
 package com.flowboard.board.service;
 
-import org.springframework.stereotype.Service;
-
+import com.flowboard.board.client.CardClient;
+import com.flowboard.board.client.CardClient.BoardStatsResponse;
+import com.flowboard.board.client.ListClient;
+import com.flowboard.board.client.WorkspaceClient;
+import com.flowboard.board.config.RabbitMQConfig;
 import com.flowboard.board.dto.AddBoardMemberRequest;
 import com.flowboard.board.dto.BoardResponse;
 import com.flowboard.board.dto.CreateBoardRequest;
+import com.flowboard.board.dto.PublicBoardDetailResponse;
+import com.flowboard.board.dto.PublicCardClientResponse;
+import com.flowboard.board.dto.PublicListClientResponse;
+import com.flowboard.board.dto.SendNotificationRequest;
 import com.flowboard.board.dto.UpdateBoardMemberRoleRequest;
 import com.flowboard.board.dto.UpdateBoardRequest;
+import com.flowboard.board.dto.WorkspaceMemberResponse;
+import com.flowboard.board.dto.WorkspaceResponse;
 import com.flowboard.board.entity.Board;
 import com.flowboard.board.entity.BoardMember;
 import com.flowboard.board.entity.BoardMemberRole;
 import com.flowboard.board.entity.Visibility;
 import com.flowboard.board.exception.CustomException;
 import com.flowboard.board.repository.BoardMemberRepository;
-import com.flowboard.board.client.WorkspaceClient;
-import com.flowboard.board.client.CardClient;
-import com.flowboard.board.client.CardClient.BoardStatsResponse;
-import com.flowboard.board.dto.WorkspaceResponse;
-import com.flowboard.board.dto.WorkspaceMemberResponse;
-import com.flowboard.board.dto.SendNotificationRequest;
-import com.flowboard.board.dto.PublicBoardDetailResponse;
-import com.flowboard.board.dto.PublicCardClientResponse;
-import com.flowboard.board.dto.PublicListClientResponse;
-import org.springframework.amqp.rabbit.core.RabbitTemplate;
-import com.flowboard.board.config.RabbitMQConfig;
-
+import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
+import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-
-import java.time.LocalDateTime;
-import java.util.List;
-import com.flowboard.board.client.ListClient;
 
 
 @Service
@@ -46,6 +40,10 @@ import com.flowboard.board.client.ListClient;
 public class BoardServiceImpl implements BoardService {
 
     private static final long FREE_BOARD_LIMIT = 2;
+    private static final String PLAN_PREMIUM = "PREMIUM";
+    private static final String PLAN_FREE = "FREE";
+    private static final String STATUS_ACTIVE = "ACTIVE";
+    private static final String STATUS_EXPIRED = "EXPIRED";
 
     private final com.flowboard.board.repository.BoardRepository boardRepository;
     private final BoardMemberRepository memberRepository;
@@ -72,9 +70,7 @@ public class BoardServiceImpl implements BoardService {
             );
         }
 
-        Visibility boardVisibility = isPublicWorkspace(workspace)
-                ? (request.getVisibility() != null ? request.getVisibility() : Visibility.PRIVATE)
-                : Visibility.PRIVATE;
+        Visibility boardVisibility = resolveBoardVisibility(workspace, request);
 
         Board board = Board.builder()
                 .workspaceId(request.getWorkspaceId())
@@ -104,54 +100,8 @@ public class BoardServiceImpl implements BoardService {
         log.info("Board created: id={} name={} workspaceId={} createdBy={}",
                 board.getId(), board.getName(), board.getWorkspaceId(), createdById);
 
-        // Create Default Lists
-        try {
-            String[] defaultLists = premium
-                    ? new String[] {"To Do", "In Progress", "In Review", "Done"}
-                    : new String[] {"To Do", "In Progress"};
-            for (int i = 0; i < defaultLists.length; i++) {
-                listClient.createList(
-                        java.util.Map.of(
-                                "boardId", board.getId(),
-                                "name", defaultLists[i],
-                                "position", i
-                        ),
-                        createdById,
-                        premium ? "PREMIUM" : "FREE",
-                        premium ? "ACTIVE" : "EXPIRED"
-                );
-            }
-        } catch (Exception e) {
-            log.error("Failed to create default lists for board id={}", board.getId(), e);
-        }
-
-        // Notify workspace members
-        try {
-            List<WorkspaceMemberResponse> members = workspaceClient.getMembers(request.getWorkspaceId(), createdById);
-            for (WorkspaceMemberResponse member : members) {
-                if (!member.getUserId().equals(createdById)) {
-                    SendNotificationRequest notification = SendNotificationRequest.builder()
-                            .recipientId(member.getUserId())
-                            .actorId(createdById)
-                            .type("ASSIGNMENT")
-                            .title("New Task Created")
-                            .message("The task '" + board.getName() + "' has been created in workspace '" + workspace.getName() + "'.")
-                            .relatedId(board.getId())
-                            .relatedType("BOARD")
-                            .deepLinkUrl("/b/" + board.getId())
-                            .sendEmail(false)
-                            .build();
-
-                    rabbitTemplate.convertAndSend(
-                            RabbitMQConfig.NOTIFICATION_EXCHANGE,
-                            RabbitMQConfig.NOTIFICATION_ROUTING_KEY,
-                            notification
-                    );
-                }
-            }
-        } catch (Exception e) {
-            log.error("Failed to send board creation notifications", e);
-        }
+        createDefaultLists(board, createdById, premium);
+        notifyWorkspaceMembersAboutBoardCreation(board, workspace, createdById);
 
         return toResponse(board);
     }
@@ -196,7 +146,11 @@ public class BoardServiceImpl implements BoardService {
 
     @Override
     public List<BoardResponse> getPublicBoards() {
-        return toResponses(boardRepository.findByVisibility(Visibility.PUBLIC));
+        List<Board> publicBoards = boardRepository.findByVisibilityAndIsClosed(Visibility.PUBLIC, false)
+                .stream()
+                .filter(this::belongsToPublicWorkspace)
+                .toList();
+        return toResponses(publicBoards);
     }
 
     @Override
@@ -217,7 +171,7 @@ public class BoardServiceImpl implements BoardService {
     @Override
     public List<PublicBoardDetailResponse> getPublicBoardDetailsByWorkspace(Long workspaceId) {
         WorkspaceResponse workspace = workspaceClient.getPublicWorkspaceById(workspaceId);
-        if (workspace.getVisibility() == null || !"PUBLIC".equalsIgnoreCase(workspace.getVisibility().toString())) {
+        if (!isPublicWorkspace(workspace)) {
             throw new CustomException("Workspace is private", HttpStatus.FORBIDDEN);
         }
 
@@ -454,6 +408,81 @@ public class BoardServiceImpl implements BoardService {
         return workspace.getVisibility() != null && "PUBLIC".equalsIgnoreCase(workspace.getVisibility());
     }
 
+    private Visibility resolveBoardVisibility(WorkspaceResponse workspace, CreateBoardRequest request) {
+        if (!isPublicWorkspace(workspace) || request.getVisibility() == null) {
+            return Visibility.PRIVATE;
+        }
+        return request.getVisibility();
+    }
+
+    private boolean belongsToPublicWorkspace(Board board) {
+        try {
+            return isPublicWorkspace(workspaceClient.getPublicWorkspaceById(board.getWorkspaceId()));
+        } catch (Exception e) {
+            log.debug("Skipping public board {} because workspace {} is not public or unavailable",
+                    board.getId(), board.getWorkspaceId());
+            return false;
+        }
+    }
+
+    private void createDefaultLists(Board board, Long createdById, boolean premium) {
+        try {
+            String[] defaultLists = defaultListNames(premium);
+            String plan = premium ? PLAN_PREMIUM : PLAN_FREE;
+            String status = premium ? STATUS_ACTIVE : STATUS_EXPIRED;
+            for (int i = 0; i < defaultLists.length; i++) {
+                listClient.createList(
+                        Map.of(
+                                "boardId", board.getId(),
+                                "name", defaultLists[i],
+                                "position", i
+                        ),
+                        createdById,
+                        plan,
+                        status
+                );
+            }
+        } catch (Exception e) {
+            log.error("Failed to create default lists for board id={}", board.getId(), e);
+        }
+    }
+
+    private String[] defaultListNames(boolean premium) {
+        if (premium) {
+            return new String[] {"To Do", "In Progress", "In Review", "Done"};
+        }
+        return new String[] {"To Do", "In Progress"};
+    }
+
+    private void notifyWorkspaceMembersAboutBoardCreation(Board board, WorkspaceResponse workspace, Long createdById) {
+        try {
+            List<WorkspaceMemberResponse> members = workspaceClient.getMembers(board.getWorkspaceId(), createdById);
+            for (WorkspaceMemberResponse member : members) {
+                if (!member.getUserId().equals(createdById)) {
+                    SendNotificationRequest notification = SendNotificationRequest.builder()
+                            .recipientId(member.getUserId())
+                            .actorId(createdById)
+                            .type("ASSIGNMENT")
+                            .title("New Task Created")
+                            .message("The task '" + board.getName() + "' has been created in workspace '" + workspace.getName() + "'.")
+                            .relatedId(board.getId())
+                            .relatedType("BOARD")
+                            .deepLinkUrl("/b/" + board.getId())
+                            .sendEmail(false)
+                            .build();
+
+                    rabbitTemplate.convertAndSend(
+                            RabbitMQConfig.NOTIFICATION_EXCHANGE,
+                            RabbitMQConfig.NOTIFICATION_ROUTING_KEY,
+                            notification
+                    );
+                }
+            }
+        } catch (Exception e) {
+            log.error("Failed to send board creation notifications", e);
+        }
+    }
+
     private boolean isWorkspaceParticipant(WorkspaceResponse workspace, Long userId) {
         if (workspace.getOwnerId() != null && workspace.getOwnerId().equals(userId)) {
             return true;
@@ -559,8 +588,8 @@ public class BoardServiceImpl implements BoardService {
     }
 
     private PublicBoardDetailResponse toPublicDetailResponse(Board board) {
-        List<PublicCardClientResponse> cards = cardClient.getByBoard(board.getId(), "PREMIUM", "ACTIVE");
-        List<PublicListClientResponse> lists = listClient.getByBoard(board.getId(), "PREMIUM", "ACTIVE");
+        List<PublicCardClientResponse> cards = cardClient.getByBoard(board.getId(), PLAN_PREMIUM, STATUS_ACTIVE);
+        List<PublicListClientResponse> lists = listClient.getByBoard(board.getId(), PLAN_PREMIUM, STATUS_ACTIVE);
 
         return PublicBoardDetailResponse.builder()
                 .id(board.getId())

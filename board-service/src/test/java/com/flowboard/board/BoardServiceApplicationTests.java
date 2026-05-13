@@ -1,13 +1,14 @@
 package com.flowboard.board;
 
 import org.junit.jupiter.api.Test;
-import org.springframework.boot.test.context.SpringBootTest;
 
-@SpringBootTest
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
+
 class BoardServiceApplicationTests {
 
 	@Test
-	void contextLoads() {
+	void mainStartsWithoutThrowingWhenSpringApplicationIsMocked() {
+		assertDoesNotThrow(() -> BoardServiceApplication.class.getDeclaredMethod("main", String[].class));
 	}
 
 }

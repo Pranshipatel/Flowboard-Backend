@@ -53,9 +53,10 @@ public class OAuthUserService extends DefaultOAuth2UserService {
 
             String baseUsername = email.split("@")[0];
             String uniqueUsername = makeUniqueUsername(baseUsername);
+            String displayName = name != null ? name : baseUsername;
 
             User newUser = User.builder()
-                    .fullName(name != null ? name : baseUsername)
+                    .fullName(displayName)
                     .email(email)
                     .username(uniqueUsername)
                     .password("") // OAuth users don't use password
@@ -98,8 +99,11 @@ public class OAuthUserService extends DefaultOAuth2UserService {
     private String extractName(OAuth2User user, String provider) {
         if ("github".equals(provider)) {
             Object name = user.getAttribute("name");
-            Object login = user.getAttribute("login"); // fallback
-            return name != null ? name.toString() : (login != null ? login.toString() : null);
+            if (name != null) {
+                return name.toString();
+            }
+            Object login = user.getAttribute("login");
+            return login != null ? login.toString() : null;
         }
         return user.getAttribute("name");
     }

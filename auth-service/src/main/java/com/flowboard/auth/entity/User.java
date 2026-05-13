@@ -25,62 +25,32 @@ public class User implements UserDetails {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     public Long id;
 
-    /**
-     * Full name of the user
-     */
+
     private String fullName;
 
-    /**
-     * Email (used for login)
-     * Must be unique and not null
-     */
     @Column(unique = true, nullable = false)
     private String email;
 
-    /**
-     * Optional username (also unique)
-     */
     @Column(unique = true)
     private String username;
 
     private String password;
 
-    /**
-     * Short bio or description
-     */
     private String bio;
 
-    /**
-     * Role of the user (ENUM)
-     */
     @Enumerated(EnumType.STRING)
     private ROLE role;
 
-    /**
-     * Indicates if account is active
-     */
     @Builder.Default
     private boolean active = true;
 
-    /**
-     * Indicates if email is verified
-     */
     @Builder.Default
     private boolean emailVerified = false;
 
-    /**
-     * Profile avatar URL
-     */
     private String avatarUrl;
 
-    /**
-     * Authentication provider (e.g., Google, GitHub)
-     */
     private String provider;
 
-    /**
-     * Account creation timestamp
-     */
     private LocalDateTime createdAt;
 
 
@@ -96,7 +66,7 @@ public class User implements UserDetails {
      */
     @Override
     public String getUsername(){
-        return email;
+        return username;
     }
 
     /**

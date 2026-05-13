@@ -1,8 +1,13 @@
 package com.flowboard.workspace.service;
 
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
+import com.flowboard.workspace.dto.AddMemberRequest;
 import com.flowboard.workspace.dto.CreateWorkspaceRequest;
+import com.flowboard.workspace.dto.UpdateMemberRoleRequest;
+import com.flowboard.workspace.dto.UpdateWorkspaceRequest;
+import com.flowboard.workspace.dto.WorkspaceMemberResponse;
 import com.flowboard.workspace.dto.WorkspaceResponse;
+import com.flowboard.workspace.entity.MemberRole;
 import com.flowboard.workspace.entity.Visibility;
 import com.flowboard.workspace.entity.Workspace;
 import com.flowboard.workspace.entity.WorkspaceMember;
@@ -17,6 +22,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -110,6 +116,127 @@ class WorkspaceServiceImplTest {
     }
 
     @Test
+    void listQueries_ShouldMapWorkspaceResponses() {
+        testWorkspace.setVisibility(Visibility.PUBLIC);
+        when(workspaceRepository.findByOwnerId(1L)).thenReturn(List.of(testWorkspace));
+        when(workspaceRepository.findByMemberUserId(2L)).thenReturn(List.of(testWorkspace));
+        when(workspaceRepository.findByVisibility(Visibility.PUBLIC)).thenReturn(List.of(testWorkspace));
+        when(memberRepository.findByWorkspaceId(1L)).thenReturn(List.of(member(10L, 1L, MemberRole.ADMIN)));
+
+        assertEquals(1, workspaceService.getByOwner(1L).size());
+        assertEquals(1, workspaceService.getByMember(2L).size());
+        assertEquals(1, workspaceService.getPublicWorkspaces().size());
+    }
+
+    @Test
+    void updateWorkspace_WhenAdmin_ShouldPersistChanges() {
+        UpdateWorkspaceRequest request = new UpdateWorkspaceRequest();
+        request.setName("Updated");
+        request.setDescription("New description");
+        request.setVisibility(Visibility.PUBLIC);
+        request.setLogoUrl("logo.png");
+
+        when(workspaceRepository.findById(1L)).thenReturn(Optional.of(testWorkspace));
+        when(memberRepository.findByWorkspaceIdAndUserId(1L, 1L))
+                .thenReturn(Optional.of(member(11L, 1L, MemberRole.ADMIN)));
+        when(memberRepository.findByWorkspaceId(1L)).thenReturn(List.of(member(11L, 1L, MemberRole.ADMIN)));
+
+        WorkspaceResponse response = workspaceService.updateWorkspace(1L, request, 1L);
+
+        assertEquals("Updated", response.getName());
+        assertEquals(Visibility.PUBLIC, response.getVisibility());
+        verify(workspaceRepository).save(testWorkspace);
+    }
+
+    @Test
+    void addMember_WhenAdmin_ShouldSaveMemberAndNotify() {
+        AddMemberRequest request = new AddMemberRequest();
+        request.setUserId(2L);
+        request.setRole(MemberRole.MEMBER);
+
+        when(workspaceRepository.findById(1L)).thenReturn(Optional.of(testWorkspace));
+        when(memberRepository.findByWorkspaceIdAndUserId(1L, 1L))
+                .thenReturn(Optional.of(member(11L, 1L, MemberRole.ADMIN)));
+        when(memberRepository.existsByWorkspaceIdAndUserId(1L, 2L)).thenReturn(false);
+        when(memberRepository.save(any(WorkspaceMember.class))).thenAnswer(i -> {
+            WorkspaceMember m = i.getArgument(0);
+            m.setId(22L);
+            return m;
+        });
+
+        WorkspaceMemberResponse response = workspaceService.addMember(1L, request, 1L);
+
+        assertEquals(2L, response.getUserId());
+        assertEquals("MEMBER", response.getRole());
+        verify(rabbitTemplate).convertAndSend(any(String.class), any(String.class), any(Object.class));
+    }
+
+    @Test
+    void addMember_WhenAlreadyMember_ShouldThrowException() {
+        AddMemberRequest request = new AddMemberRequest();
+        request.setUserId(2L);
+
+        when(workspaceRepository.findById(1L)).thenReturn(Optional.of(testWorkspace));
+        when(memberRepository.findByWorkspaceIdAndUserId(1L, 1L))
+                .thenReturn(Optional.of(member(11L, 1L, MemberRole.ADMIN)));
+        when(memberRepository.existsByWorkspaceIdAndUserId(1L, 2L)).thenReturn(true);
+
+        assertThrows(CustomException.class, () -> workspaceService.addMember(1L, request, 1L));
+    }
+
+    @Test
+    void removeMember_WhenAdmin_ShouldDeleteAndNotify() {
+        when(workspaceRepository.findById(1L)).thenReturn(Optional.of(testWorkspace));
+        when(memberRepository.findByWorkspaceIdAndUserId(1L, 1L))
+                .thenReturn(Optional.of(member(11L, 1L, MemberRole.ADMIN)));
+        when(memberRepository.existsByWorkspaceIdAndUserId(1L, 2L)).thenReturn(true);
+
+        workspaceService.removeMember(1L, 2L, 1L);
+
+        verify(memberRepository).deleteByWorkspaceIdAndUserId(1L, 2L);
+        verify(rabbitTemplate).convertAndSend(any(String.class), any(String.class), any(Object.class));
+    }
+
+    @Test
+    void removeMember_WhenTargetIsOwner_ShouldThrowException() {
+        when(workspaceRepository.findById(1L)).thenReturn(Optional.of(testWorkspace));
+        when(memberRepository.findByWorkspaceIdAndUserId(1L, 2L))
+                .thenReturn(Optional.of(member(12L, 2L, MemberRole.ADMIN)));
+        when(memberRepository.existsByWorkspaceIdAndUserId(1L, 1L)).thenReturn(true);
+
+        assertThrows(CustomException.class, () -> workspaceService.removeMember(1L, 1L, 2L));
+    }
+
+    @Test
+    void updateMemberRole_WhenMemberExists_ShouldSaveRole() {
+        UpdateMemberRoleRequest request = new UpdateMemberRoleRequest();
+        request.setRole(MemberRole.ADMIN);
+        WorkspaceMember target = member(22L, 2L, MemberRole.MEMBER);
+
+        when(workspaceRepository.findById(1L)).thenReturn(Optional.of(testWorkspace));
+        when(memberRepository.findByWorkspaceIdAndUserId(1L, 1L))
+                .thenReturn(Optional.of(member(11L, 1L, MemberRole.ADMIN)));
+        when(memberRepository.findByWorkspaceIdAndUserId(1L, 2L)).thenReturn(Optional.of(target));
+
+        workspaceService.updateMemberRole(1L, 2L, request, 1L);
+
+        assertEquals(MemberRole.ADMIN, target.getRole());
+        verify(memberRepository).save(target);
+    }
+
+    @Test
+    void getMembers_ShouldReturnMemberDtos() {
+        when(workspaceRepository.findById(1L)).thenReturn(Optional.of(testWorkspace));
+        when(memberRepository.findByWorkspaceId(1L))
+                .thenReturn(List.of(member(11L, 1L, MemberRole.ADMIN), member(12L, 2L, MemberRole.MEMBER)));
+
+        List<WorkspaceMemberResponse> response = workspaceService.getMembers(1L);
+
+        assertEquals(2, response.size());
+        assertEquals("ADMIN", response.get(0).getRole());
+    }
+
+    @Test
     void deleteWorkspace_WhenNotOwner_ShouldThrowException() {
         when(workspaceRepository.findById(1L)).thenReturn(Optional.of(testWorkspace));
 
@@ -123,5 +250,15 @@ class WorkspaceServiceImplTest {
         workspaceService.deleteWorkspace(1L, 1L);
 
         verify(workspaceRepository).delete(testWorkspace);
+    }
+
+    private WorkspaceMember member(Long id, Long userId, MemberRole role) {
+        return WorkspaceMember.builder()
+                .id(id)
+                .workspace(testWorkspace)
+                .userId(userId)
+                .role(role)
+                .joinedAt(LocalDateTime.now())
+                .build();
     }
 }

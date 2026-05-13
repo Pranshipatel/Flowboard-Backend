@@ -33,6 +33,8 @@ import java.util.List;
 @Slf4j
 public class AuthServiceImpl implements AuthService {
 
+    private static final String USER_NOT_FOUND = "User not found";
+
     private final UserRepository repository;
     private final PasswordEncoder passwordEncoder;
     private final JwtUtil jwtUtil;
@@ -109,7 +111,7 @@ public class AuthServiceImpl implements AuthService {
     public void sendVerificationOtp(String email){
 
         User user = repository.findByEmail(email)
-                .orElseThrow(() -> new CustomException("User not found", HttpStatus.NOT_FOUND));
+                .orElseThrow(() -> new CustomException(USER_NOT_FOUND, HttpStatus.NOT_FOUND));
 
         if(user.isEmailVerified()){
             throw new CustomException("Email is already verified", HttpStatus.BAD_REQUEST);
@@ -122,7 +124,7 @@ public class AuthServiceImpl implements AuthService {
     public void verifyEmail(String email, String otp){
 
         User user = repository.findByEmail(email)
-                .orElseThrow(() -> new CustomException("User not found", HttpStatus.NOT_FOUND));
+                .orElseThrow(() -> new CustomException(USER_NOT_FOUND, HttpStatus.NOT_FOUND));
 
         if(user.isEmailVerified()){
             throw new CustomException("Email is already verified", HttpStatus.BAD_REQUEST);
@@ -155,7 +157,7 @@ public class AuthServiceImpl implements AuthService {
     public void resetPassword(ResetPasswordRequest request){
 
         User user = repository.findByEmail(request.getEmail())
-                .orElseThrow(() -> new CustomException("User not found", HttpStatus.NOT_FOUND));
+                .orElseThrow(() -> new CustomException(USER_NOT_FOUND, HttpStatus.NOT_FOUND));
 
         otpService.verifyOtp(request.getEmail(), request.getOtp());
 
@@ -187,7 +189,7 @@ public class AuthServiceImpl implements AuthService {
             String email = jwtUtil.extractEmail(token);
 
             User user = repository.findByEmail(email)
-                    .orElseThrow(() -> new CustomException("User not found", HttpStatus.NOT_FOUND));
+                    .orElseThrow(() -> new CustomException(USER_NOT_FOUND, HttpStatus.NOT_FOUND));
 
             if (!user.isActive()) {
                 throw new CustomException("Account is deactivated", HttpStatus.FORBIDDEN);
@@ -206,13 +208,13 @@ public class AuthServiceImpl implements AuthService {
     @Override
     public User getUserByEmail(String email) {
         return repository.findByEmail(email)
-                .orElseThrow(() -> new CustomException("User not found", HttpStatus.NOT_FOUND));
+                .orElseThrow(() -> new CustomException(USER_NOT_FOUND, HttpStatus.NOT_FOUND));
     }
 
     @Override
     public User getUserById(Long id) {
         return repository.findById(id)
-                .orElseThrow(() -> new CustomException("User not found", HttpStatus.NOT_FOUND));
+                .orElseThrow(() -> new CustomException(USER_NOT_FOUND, HttpStatus.NOT_FOUND));
     }
 
     @Override
@@ -322,7 +324,7 @@ public class AuthServiceImpl implements AuthService {
     public void deleteUser(Long id) {
 
         if (!repository.existsById(id)) {
-            throw new CustomException("User not found", HttpStatus.NOT_FOUND);
+            throw new CustomException(USER_NOT_FOUND, HttpStatus.NOT_FOUND);
         }
 
         repository.deleteById(id);

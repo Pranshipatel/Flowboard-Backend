@@ -101,7 +101,7 @@ public class CardController {
             @RequestHeader(value = "X-User-Id", required = false) Long userId
     ) {
         return ResponseEntity.ok(
-                cardService.updateCard(id, request, resolveUserId(id))
+                cardService.updateCard(id, request, resolveUserId(userId))
         );
     }
 

@@ -29,12 +29,12 @@ public class AdminStatsController {
         
         List<AdminUserResponse> users = authAdminClient.listUsers(authorization);
         
-        AdminStatsResponse stats = AdminStatsResponse.builder()
-                .totalUsers(users.size())
-                .totalWorkspaces(12) // Mocked for now
-                .totalBoards(45)     // Mocked for now
-                .activeUsersToday(users.stream().filter(AdminUserResponse::isActive).count())
-                .build();
+        AdminStatsResponse stats = new AdminStatsResponse(
+                users.size(),
+                12, // Mocked for now
+                45, // Mocked for now
+                users.stream().filter(AdminUserResponse::isActive).count()
+        );
                 
         return ResponseEntity.ok(stats);
     }

@@ -41,7 +41,7 @@ public class AuthFilter extends AbstractGatewayFilterFactory<AuthFilter.Config> 
             String path = request.getURI().getPath();
 
             // --- 2. Skip JWT check for public routes ---
-            if (isExcluded(path, config.getExcludedPaths())) {
+            if (isAlwaysPublic(path) || isExcluded(path, config.getExcludedPaths())) {
                 log.debug("Public routes - skipping JWT: {}", path);
                 return chain.filter(exchange);
             }
@@ -97,6 +97,12 @@ public class AuthFilter extends AbstractGatewayFilterFactory<AuthFilter.Config> 
             }
             return path.equals(pattern);
         });
+    }
+
+    private boolean isAlwaysPublic(String path) {
+        return path.equals("/api/v1/workspaces/public")
+                || path.equals("/api/v1/boards/public")
+                || path.startsWith("/api/v1/boards/public/");
     }
 
     private Mono<Void> reject(ServerWebExchange exchange, String message, HttpStatus status) {

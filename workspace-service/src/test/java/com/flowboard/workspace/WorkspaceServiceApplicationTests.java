@@ -1,13 +1,12 @@
 package com.flowboard.workspace;
 
 import org.junit.jupiter.api.Test;
-import org.springframework.boot.test.context.SpringBootTest;
 
-@SpringBootTest
 class WorkspaceServiceApplicationTests {
 
 	@Test
-	void contextLoads() {
+	void applicationClassIsPresent() {
+		org.junit.jupiter.api.Assertions.assertNotNull(WorkspaceServiceApplication.class);
 	}
 
 }

@@ -37,9 +37,17 @@ public class PremiumSubscriptionFilter extends AbstractGatewayFilterFactory<Prem
                 return chain.filter(exchange);
             }
 
+            String path = exchange.getRequest().getURI().getPath();
+            if (isPublicBoardPath(path)) {
+                return chain.filter(withSubscriptionHeaders(exchange, "FREE", "EXPIRED"));
+            }
+
             String userIdHeader = exchange.getRequest().getHeaders().getFirst("X-User-Id");
             if (userIdHeader == null || userIdHeader.isBlank()) {
-                return reject(exchange, "Missing X-User-Id header", HttpStatus.UNAUTHORIZED);
+                if (!config.isRequirePremium()) {
+                    return chain.filter(withSubscriptionHeaders(exchange, "FREE", "EXPIRED"));
+                }
+                return reject(exchange, "Missing X-User-Id header for path: " + path, HttpStatus.UNAUTHORIZED);
             }
 
             Long userId;
@@ -76,10 +84,15 @@ public class PremiumSubscriptionFilter extends AbstractGatewayFilterFactory<Prem
                         }
 
                         log.warn("Unable to validate subscription. Continuing as FREE for path={}",
-                                exchange.getRequest().getURI().getPath(), ex);
+                                path, ex);
                         return chain.filter(withSubscriptionHeaders(exchange, "FREE", "EXPIRED"));
                     });
         };
+    }
+
+    private boolean isPublicBoardPath(String path) {
+        if (path == null) return false;
+        return path.contains("/public");
     }
 
     private ServerWebExchange withSubscriptionHeaders(ServerWebExchange exchange, String plan, String status) {

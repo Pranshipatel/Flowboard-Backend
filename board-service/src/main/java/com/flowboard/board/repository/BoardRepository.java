@@ -30,4 +30,7 @@ public interface BoardRepository extends JpaRepository<Board, Long> {
 
     // Get boards by visibility (e.g., PUBLIC)
     List<Board> findByVisibility(Visibility visibility);
+
+    // Get visible public board catalogue entries
+    List<Board> findByVisibilityAndIsClosed(Visibility visibility, boolean isClosed);
 }

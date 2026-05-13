@@ -30,12 +30,9 @@ public class WorkspaceController {
     @PostMapping
     public ResponseEntity<WorkspaceResponse> create(
             @Valid @RequestBody CreateWorkspaceRequest request,
-            @RequestHeader(value = "X-User-Id", required = false) Long userIdHeader,
-            @RequestHeader(value = "X-User-Email", required = false) String userEmail,
-            @RequestHeader(value = "Authorization", required = false) String authHeader
+            @RequestHeader(value = "X-User-Id", required = false) Long userIdHeader
     ){
-    	System.out.println("X-User-Id: " + userIdHeader);
-        Long userId = resolveUserId(userIdHeader, userEmail, authHeader);
+        Long userId = resolveUserId(userIdHeader);
 
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(workspaceService.createWorkspace(request, userId));
@@ -45,9 +42,7 @@ public class WorkspaceController {
     @GetMapping("/{id}")
     public ResponseEntity<WorkspaceResponse> getById(
             @PathVariable Long id,
-            @RequestHeader(value = "X-User-Id", required = false) Long userIdHeader,
-            @RequestHeader(value = "X-User-Email", required = false) String userEmail,
-            @RequestHeader(value = "Authorization", required = false) String authHeader) {
+            @RequestHeader(value = "X-User-Id", required = false) Long userIdHeader) {
 
         return ResponseEntity.ok(workspaceService.getById(id, userIdHeader));
     }
@@ -75,11 +70,9 @@ public class WorkspaceController {
     public ResponseEntity<WorkspaceResponse> update(
             @PathVariable Long id,
             @Valid @RequestBody UpdateWorkspaceRequest request,
-            @RequestHeader(value = "X-User-Id", required = false) Long userIdHeader,
-            @RequestHeader(value = "X-User-Email", required = false) String userEmail,
-            @RequestHeader(value = "Authorization", required = false) String authHeader) {
+            @RequestHeader(value = "X-User-Id", required = false) Long userIdHeader) {
 
-        Long userId = resolveUserId(userIdHeader, userEmail, authHeader);
+        Long userId = resolveUserId(userIdHeader);
         return ResponseEntity.ok(workspaceService.updateWorkspace(id, request, userId));
     }
 
@@ -87,11 +80,9 @@ public class WorkspaceController {
     @DeleteMapping("/{id}")
     public ResponseEntity<String> delete(
             @PathVariable Long id,
-            @RequestHeader(value = "X-User-Id", required = false) Long userIdHeader,
-            @RequestHeader(value = "X-User-Email", required = false) String userEmail,
-            @RequestHeader(value = "Authorization", required = false) String authHeader) {
+            @RequestHeader(value = "X-User-Id", required = false) Long userIdHeader) {
 
-        Long userId = resolveUserId(userIdHeader, userEmail, authHeader);
+        Long userId = resolveUserId(userIdHeader);
         workspaceService.deleteWorkspace(id, userId);
 
         return ResponseEntity.ok("Workspace deleted successfully");
@@ -102,11 +93,9 @@ public class WorkspaceController {
     public ResponseEntity<WorkspaceMemberResponse> addMember(
             @PathVariable Long id,
             @Valid @RequestBody AddMemberRequest request,
-            @RequestHeader(value = "X-User-Id", required = false) Long userIdHeader,
-            @RequestHeader(value = "X-User-Email", required = false) String userEmail,
-            @RequestHeader(value = "Authorization", required = false) String authHeader) {
+            @RequestHeader(value = "X-User-Id", required = false) Long userIdHeader) {
 
-        Long userId = resolveUserId(userIdHeader, userEmail, authHeader);
+        Long userId = resolveUserId(userIdHeader);
 
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(workspaceService.addMember(id, request, userId));
@@ -117,11 +106,9 @@ public class WorkspaceController {
     public ResponseEntity<String> removeMember(
             @PathVariable Long id,
             @PathVariable Long memberId,
-            @RequestHeader(value = "X-User-Id", required = false) Long userIdHeader,
-            @RequestHeader(value = "X-User-Email", required = false) String userEmail,
-            @RequestHeader(value = "Authorization", required = false) String authHeader) {
+            @RequestHeader(value = "X-User-Id", required = false) Long userIdHeader) {
 
-        Long userId = resolveUserId(userIdHeader, userEmail, authHeader);
+        Long userId = resolveUserId(userIdHeader);
         workspaceService.removeMember(id, memberId, userId);
 
         return ResponseEntity.ok("Member removed successfully");
@@ -133,11 +120,9 @@ public class WorkspaceController {
             @PathVariable Long id,
             @PathVariable Long memberId,
             @Valid @RequestBody UpdateMemberRoleRequest request,
-            @RequestHeader(value = "X-User-Id", required = false) Long userIdHeader,
-            @RequestHeader(value = "X-User-Email", required = false) String userEmail,
-            @RequestHeader(value = "Authorization", required = false) String authHeader) {
+            @RequestHeader(value = "X-User-Id", required = false) Long userIdHeader) {
 
-        Long userId = resolveUserId(userIdHeader, userEmail, authHeader);
+        Long userId = resolveUserId(userIdHeader);
         workspaceService.updateMemberRole(id, memberId, request, userId);
 
         return ResponseEntity.ok("Member role updated successfully");
@@ -150,14 +135,14 @@ public class WorkspaceController {
     }
 
     // Resolve user ID from headers
-    private Long resolveUserId(Long userIdHeader, String userEmail, String authHeader){
+    private Long resolveUserId(Long userIdHeader){
 
         if(userIdHeader != null){
             return userIdHeader;
         }
 
         throw new com.flowboard.workspace.exception.CustomException(
-                "Either X-User-Id or X-User-Email header is required",
+                "X-User-Id header is required",
                 org.springframework.http.HttpStatus.BAD_REQUEST
         );
     }

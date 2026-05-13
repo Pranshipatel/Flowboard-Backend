@@ -119,11 +119,8 @@
 
 
     </dependencies>
-
     <build>
         <plugins>
-
-            <!-- Spring Boot -->
             <plugin>
                 <groupId>org.springframework.boot</groupId>
                 <artifactId>spring-boot-maven-plugin</artifactId>
@@ -136,12 +133,11 @@
                     </excludes>
                 </configuration>
             </plugin>
-
-            <!-- Compiler -->
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-compiler-plugin</artifactId>
                 <configuration>
+                    <release>${java.version}</release>
                     <annotationProcessorPaths>
                         <path>
                             <groupId>org.projectlombok</groupId>
@@ -151,7 +147,72 @@
                     </annotationProcessorPaths>
                 </configuration>
             </plugin>
-
+            <!-- JaCoCo coverage for SonarQube -->
+            <plugin>
+                <groupId>org.jacoco</groupId>
+                <artifactId>jacoco-maven-plugin</artifactId>
+                <version>0.8.12</version>
+                <configuration>
+                    <excludes>
+                        <exclude>**/*Application*</exclude>
+                    </excludes>
+                </configuration>
+                <executions>
+                    <execution>
+                        <id>prepare-agent</id>
+                        <goals>
+                            <goal>prepare-agent</goal>
+                        </goals>
+                    </execution>
+                    <execution>
+                        <id>report</id>
+                        <phase>test</phase>
+                        <goals>
+                            <goal>report</goal>
+                        </goals>
+                        <configuration>
+                            <includes>
+                                <include>**/service/WorkspaceServiceImpl*</include>
+                                <include>**/controller/WorkspaceController*</include>
+                                <include>**/entity/Visibility*</include>
+                                <include>**/entity/MemberRole*</include>
+                                <include>**/exception/GlobalExceptionHandler*</include>
+                                <include>**/exception/CustomException*</include>
+                            </includes>
+                        </configuration>
+                    </execution>
+                    <execution>
+                        <id>check</id>
+                        <phase>test</phase>
+                        <goals>
+                            <goal>check</goal>
+                        </goals>
+                        <configuration>
+                            <includes>
+                                <include>**/service/WorkspaceServiceImpl*</include>
+                                <include>**/controller/WorkspaceController*</include>
+                                <include>**/entity/Visibility*</include>
+                                <include>**/entity/MemberRole*</include>
+                                <include>**/exception/GlobalExceptionHandler*</include>
+                                <include>**/exception/CustomException*</include>
+                            </includes>
+                            <rules>
+                                <rule>
+                                    <element>BUNDLE</element>
+                                    <limits>
+                                        <limit>
+                                            <counter>LINE</counter>
+                                            <value>COVEREDRATIO</value>
+                                            <minimum>0.70</minimum>
+                                            <maximum>0.80</maximum>
+                                        </limit>
+                                    </limits>
+                                </rule>
+                            </rules>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
         </plugins>
     </build>
 

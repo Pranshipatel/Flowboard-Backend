@@ -6,6 +6,7 @@ import com.payment.dto.VerifyPaymentRequest;
 import com.payment.entity.PlanType;
 import com.payment.entity.Subscription;
 import com.payment.entity.SubscriptionStatus;
+import com.payment.exception.PaymentProcessingException;
 import com.payment.razorpay.RazorpaySignatureVerifier;
 import com.payment.repository.SubscriptionRepository;
 import com.razorpay.Order;
@@ -62,7 +63,7 @@ public class PaymentSubscriptionService {
 
     } catch (Exception e) {
       log.error("Razorpay createOrder failed: userId={} amountInr={} err={}", userId, amountInr, e.getMessage(), e);
-      throw new RuntimeException("Failed to create Razorpay order: " + e.getMessage(), e);
+      throw new PaymentProcessingException("Failed to create Razorpay order: " + e.getMessage(), e);
     }
   }
 

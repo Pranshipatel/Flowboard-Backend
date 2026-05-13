@@ -11,29 +11,10 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 import java.time.LocalDateTime;
 import java.util.stream.Collectors;
 
-/**
- * Global Exception Handler
- *
- * Handles all exceptions across the application in a centralized way.
- * Ensures consistent error response structure.
- *
- * Responsibilities:
- * - Handle custom business exceptions
- * - Handle validation errors (@Valid)
- * - Handle unexpected system exceptions
- */
+
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
-    /**
-     * Handles CustomException (application-specific exceptions)
-     *
-     * Builds a structured error response using:
-     * - Timestamp
-     * - HTTP status code
-     * - Error reason
-     * - Custom message
-     */
     @ExceptionHandler(CustomException.class)
     public ResponseEntity<ErrorResponse> handleCustomException(CustomException ex) {
 

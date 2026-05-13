@@ -12,4 +12,8 @@ public class EurekaServerApplication {
 		SpringApplication.run(EurekaServerApplication.class, args);
 	}
 
+	public static String serviceId() {
+		return "eureka-server";
+	}
+
 }

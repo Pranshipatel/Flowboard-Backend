@@ -34,6 +34,8 @@ import java.util.List;
 @Slf4j
 public class WorkspaceServiceImpl implements WorkspaceService {
 
+    private static final String RELATED_TYPE_WORKSPACE = "WORKSPACE";
+
     private final WorkspaceRepository workspaceRepository;
     private final WorkspaceMemberRepository memberRepository;
     private final RabbitTemplate rabbitTemplate;
@@ -163,7 +165,7 @@ public class WorkspaceServiceImpl implements WorkspaceService {
                             .title("Workspace Deleted")
                             .message("The workspace '" + workspace.getName() + "' has been deleted.")
                             .relatedId(workspaceId)
-                            .relatedType("WORKSPACE")
+                            .relatedType(RELATED_TYPE_WORKSPACE)
                             .build();
                     rabbitTemplate.convertAndSend(
                             RabbitMQConfig.NOTIFICATION_EXCHANGE,
@@ -214,7 +216,7 @@ public class WorkspaceServiceImpl implements WorkspaceService {
                     .title("Added to Workspace")
                     .message("You have been added to workspace '" + workspace.getName() + "' as a " + role.name())
                     .relatedId(workspaceId)
-                    .relatedType("WORKSPACE")
+                    .relatedType(RELATED_TYPE_WORKSPACE)
                     .build();
             rabbitTemplate.convertAndSend(
                     RabbitMQConfig.NOTIFICATION_EXCHANGE,
@@ -263,7 +265,7 @@ public class WorkspaceServiceImpl implements WorkspaceService {
                     .title("Removed from Workspace")
                     .message("You have been removed from workspace '" + workspace.getName() + "'")
                     .relatedId(workspaceId)
-                    .relatedType("WORKSPACE")
+                    .relatedType(RELATED_TYPE_WORKSPACE)
                     .build();
             rabbitTemplate.convertAndSend(
                     RabbitMQConfig.NOTIFICATION_EXCHANGE,
@@ -292,7 +294,7 @@ public class WorkspaceServiceImpl implements WorkspaceService {
         member.setRole(request.getRole());
         memberRepository.save(member);
 
-        log.info("Member role updated: workdspaceId={} userId={} newRole={}",
+        log.info("Member role updated: workspaceId={} userId={} newRole={}",
                 workspaceId, userId, request.getRole());
     }
 

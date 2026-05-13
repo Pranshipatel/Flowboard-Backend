@@ -57,6 +57,12 @@ spring:
                   /swagger-ui/index.html
 
         # ── Workspace Service ─────────────────────────────────────────
+        - id: public-workspace-service
+          uri: lb://WORKSPACE-SERVICE
+          order: -20
+          predicates:
+            - Path=/api/v1/workspaces/public
+
         - id: workspace-service
           uri: lb://WORKSPACE-SERVICE
           predicates:
@@ -73,6 +79,17 @@ spring:
                   /swagger-ui/index.html
 
         # ── Board Service ─────────────────────────────────────────────
+        - id: public-board-service
+          uri: lb://BOARD-SERVICE
+          order: -20
+          predicates:
+            - Path=/api/v1/boards/public,/api/v1/boards/public/**
+          filters:
+            - name: PremiumSubscriptionFilter
+              args:
+                enabled: true
+                requirePremium: false
+
         - id: board-service
           uri: lb://BOARD-SERVICE
           predicates:

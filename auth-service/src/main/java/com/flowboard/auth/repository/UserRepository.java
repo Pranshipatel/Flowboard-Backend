@@ -11,55 +11,17 @@ import com.flowboard.auth.entity.User;
 import java.util.List;
 import java.util.Optional;
 
-/**
- * User Repository
- *
- * Extends JpaRepository to provide CRUD operations for User entity.
- *
- * Responsibilities:
- * - Perform database operations on User table
- * - Provide custom query methods for authentication and search
- */
 public interface UserRepository extends JpaRepository<User, Long> {
 
-    /**
-     * Find user by email
-     *
-     * @param email user email
-     * @return Optional<User>
-     */
+
     Optional<User> findByEmail(String email);
 
-    /**
-     * Find user by username
-     *
-     * @param username username
-     * @return Optional<User>
-     */
     Optional<User> findByUsername(String username);
 
-    /**
-     * Check if email already exists
-     *
-     * @param email user email
-     * @return true if exists, else false
-     */
     boolean existsByEmail(String email);
 
-    /**
-     * Check if username already exists
-     *
-     * @param username username
-     * @return true if exists, else false
-     */
     boolean existsByUsername(String username);
 
-    /**
-     * Get all users by role
-     *
-     * @param role user role
-     * @return list of users with given role
-     */
     List<User> findAllByRole(ROLE role);
 
     /**
@@ -76,10 +38,5 @@ public interface UserRepository extends JpaRepository<User, Long> {
             "LOWER(u.email) LIKE LOWER(CONCAT('%', :key, '%'))")
     List<User> searchUsers(@Param("key") String key);
 
-    /**
-     * Delete user by ID
-     *
-     * @param id user ID
-     */
     void deleteById(Long id);
 }

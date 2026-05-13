@@ -36,10 +36,8 @@ public class BoardDueDateNotifier {
         List<Board> boards = boardRepository.findAll();
 
         for (Board board : boards) {
-            if (!board.isClosed() && board.getDueDate() != null) {
-                if (now.isAfter(board.getDueDate())) {
-                    notifyWorkspaceMembers(board);
-                }
+            if (!board.isClosed() && board.getDueDate() != null && now.isAfter(board.getDueDate())) {
+                notifyWorkspaceMembers(board);
             }
         }
     }

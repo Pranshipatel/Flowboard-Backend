@@ -124,12 +124,71 @@ class NotificationServiceImplTest {
     void sendBulk_WhenValid_ShouldSaveAll() {
         SendBulkNotificationRequest bulkRequest = new SendBulkNotificationRequest();
         bulkRequest.setRecipientIds(List.of(2L, 3L));
+        bulkRequest.setActorId(1L);
         bulkRequest.setType(NotificationType.ASSIGNMENT);
         bulkRequest.setTitle("Bulk Title");
+        bulkRequest.setMessage("Bulk Message");
+        bulkRequest.setRelatedId(9L);
+        bulkRequest.setRelatedType("CARD");
+        bulkRequest.setDeepLinkUrl("/cards/9");
 
         List<NotificationResponse> responses = notificationService.sendBulk(bulkRequest);
 
         assertEquals(2, responses.size());
         verify(notificationRepository).saveAll(anyList());
+    }
+
+    @Test
+    void queryAndCleanupMethods_ShouldDelegateToRepository() {
+        when(notificationRepository.findByRecipientIdOrderByCreatedAtDesc(2L)).thenReturn(List.of(testNotification));
+        when(notificationRepository.findByRecipientIdAndIsReadFalseOrderByCreatedAtDesc(2L)).thenReturn(List.of(testNotification));
+        when(notificationRepository.findByRecipientIdAndTypeOrderByCreatedAtDesc(2L, NotificationType.ASSIGNMENT)).thenReturn(List.of(testNotification));
+        when(notificationRepository.findAll()).thenReturn(List.of(testNotification));
+        when(notificationRepository.countByRecipientIdAndIsReadFalse(2L)).thenReturn(3L);
+
+        assertEquals(1, notificationService.getByRecipient(2L).size());
+        assertEquals(1, notificationService.getUnreadByRecipient(2L).size());
+        assertEquals(1, notificationService.getByRecipientAndType(2L, NotificationType.ASSIGNMENT).size());
+        assertEquals(1, notificationService.getAll().size());
+        assertEquals(3L, notificationService.getUnreadCount(2L));
+
+        notificationService.markAllAsRead(2L);
+        notificationService.deleteReadNotifications(2L);
+
+        verify(notificationRepository).markAllAsRead(2L);
+        verify(notificationRepository).deleteReadByRecipientId(2L);
+    }
+
+    @Test
+    void markAsRead_WhenMissingAfterOwnershipCheck_ShouldThrowException() {
+        when(notificationRepository.existsByIdAndRecipientId(1L, 2L)).thenReturn(true);
+        when(notificationRepository.findById(1L)).thenReturn(Optional.empty());
+
+        assertThrows(CustomException.class, () -> notificationService.markAsRead(1L, 2L));
+    }
+
+    @Test
+    void delete_WhenNotRecipient_ShouldThrowException() {
+        when(notificationRepository.existsByIdAndRecipientId(1L, 3L)).thenReturn(false);
+
+        assertThrows(CustomException.class, () -> notificationService.deleteNotification(1L, 3L));
+    }
+
+    @Test
+    void notifyDueDateApproaching_ShouldBuildAndSendNotification() {
+        when(notificationRepository.save(any(Notification.class))).thenAnswer(i -> {
+            Notification n = i.getArgument(0);
+            n.setId(10L);
+            return n;
+        });
+
+        notificationService.notifyDueDateApproaching(2L, 99L, "Important card", "2 hours");
+
+        verify(notificationRepository).save(argThat(notification ->
+                notification.getRecipientId().equals(2L)
+                        && notification.getRelatedId().equals(99L)
+                        && notification.getType() == NotificationType.DUE_DATE
+                        && notification.getDeepLinkUrl().equals("/cards/99")
+        ));
     }
 }

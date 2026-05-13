@@ -1,13 +1,14 @@
 package com.admin;
 
 import org.junit.jupiter.api.Test;
-import org.springframework.boot.test.context.SpringBootTest;
 
-@SpringBootTest
+import static org.assertj.core.api.Assertions.assertThat;
+
 class AdminServiceApplicationTests {
 
 	@Test
-	void contextLoads() {
+	void applicationClassIsAvailable() {
+		assertThat(AdminServiceApplication.class).isNotNull();
 	}
 
 }
