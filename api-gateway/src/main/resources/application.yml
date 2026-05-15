@@ -247,6 +247,7 @@ spring:
               - "http://localhost:*"
               - "http://127.0.0.1:*"
               - "http://192.168.56.1:*"
+              - "http://flowboard-frontend-pranshi.s3-website.ap-south-1.amazonaws.com"
             allowedMethods:
               - GET
               - POST

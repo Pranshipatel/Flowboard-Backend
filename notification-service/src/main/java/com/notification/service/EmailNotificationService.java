@@ -22,6 +22,9 @@ public class EmailNotificationService {
     @Value("${spring.mail.username}")
     private String fromEmail;
 
+    @Value("${app.frontend-url:http://flowboard-frontend-pranshi.s3-website.ap-south-1.amazonaws.com}")
+    private String frontendUrl;
+
     @Async
     public void sendNotificationEmail(String toEmail,
                                       String title,
@@ -55,14 +58,14 @@ public class EmailNotificationService {
         String linkHtml = (deepLinkUrl != null && !deepLinkUrl.isBlank())
                 ? """
                 <div style="margin:24px 0;text-align:center;">
-                    <a href="http://localhost:8080%s"
+                    <a href="%s%s"
                        style="background:#4f46e5;color:#fff;padding:12px 28px;
                               border-radius:6px;text-decoration:none;
                               font-weight:500;font-size:14px;">
                        View in FlowBoard
                     </a>
                 </div>
-                """.formatted(deepLinkUrl)
+                """.formatted(frontendUrl, deepLinkUrl)
                 : "";
 
         return """

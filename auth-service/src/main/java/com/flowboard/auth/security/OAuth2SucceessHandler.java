@@ -4,6 +4,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.oauth2.core.user.OAuth2User;
 import org.springframework.security.web.authentication.AuthenticationSuccessHandler;
@@ -27,6 +28,9 @@ public class OAuth2SucceessHandler implements AuthenticationSuccessHandler {
     private final JwtUtil jwtUtil;
     private final UserRepository userRepository;
 
+    @Value("${app.frontend-url:http://flowboard-frontend-pranshi.s3-website.ap-south-1.amazonaws.com}")
+    private String frontendUrl;
+
     @Override
     public void onAuthenticationSuccess(HttpServletRequest request,
                                         HttpServletResponse response,
@@ -48,10 +52,10 @@ public class OAuth2SucceessHandler implements AuthenticationSuccessHandler {
         log.info("OAuth2 login success: email={} userId={}", email, user.getId());
 
         // Redirect to frontend with token and user details
-        String frontendUrl = "http://localhost:4200/oauth2/callback?token=" + token
+        String redirectUrl = frontendUrl + "/oauth2/callback?token=" + token
                 + "&userId=" + user.getId()
                 + "&role=" + user.getRole().name();
 
-        response.sendRedirect(frontendUrl);
+        response.sendRedirect(redirectUrl);
     }
 }
