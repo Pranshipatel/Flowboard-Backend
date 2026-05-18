@@ -19,8 +19,10 @@ public interface WorkspaceService {
     List<WorkspaceResponse> getByOwner(Long ownerId);
     List<WorkspaceResponse> getByMember(Long userId);
     List<WorkspaceResponse> getPublicWorkspaces();
+    List<WorkspaceResponse> getAllWorkspacesForAdmin();
     WorkspaceResponse updateWorkspace(Long workspaceId, UpdateWorkspaceRequest request, Long requesterId);
     void deleteWorkspace(Long workspaceId, Long requesterId);
+    void deleteWorkspaceForAdmin(Long workspaceId);
 
     // Member management
     WorkspaceMemberResponse addMember(Long workspaceId, AddMemberRequest request, Long requesterId);

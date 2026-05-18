@@ -154,6 +154,11 @@ public class BoardServiceImpl implements BoardService {
     }
 
     @Override
+    public List<BoardResponse> getAllBoardsForAdmin() {
+        return toResponses(boardRepository.findAll());
+    }
+
+    @Override
     public PublicBoardDetailResponse getPublicBoardDetail(Long boardId) {
         Board board = findBoard(boardId);
         if (board.getVisibility() != Visibility.PUBLIC || board.isClosed()) {
@@ -402,6 +407,36 @@ public class BoardServiceImpl implements BoardService {
         return boardRepository.findById(boardId)
                 .orElseThrow(() -> new CustomException(
                         "Board not found", HttpStatus.NOT_FOUND));
+    }
+
+    @Override
+    @Transactional
+    public BoardResponse closeBoardForAdmin(Long boardId) {
+        Board board = findBoard(boardId);
+        board.setClosed(true);
+        board.setUpdatedAt(LocalDateTime.now());
+        boardRepository.save(board);
+        log.info("Board closed by platform admin: id={}", boardId);
+        return toResponse(board);
+    }
+
+    @Override
+    @Transactional
+    public BoardResponse reopenBoardForAdmin(Long boardId) {
+        Board board = findBoard(boardId);
+        board.setClosed(false);
+        board.setUpdatedAt(LocalDateTime.now());
+        boardRepository.save(board);
+        log.info("Board reopened by platform admin: id={}", boardId);
+        return toResponse(board);
+    }
+
+    @Override
+    @Transactional
+    public void deleteBoardForAdmin(Long boardId) {
+        Board board = findBoard(boardId);
+        boardRepository.delete(board);
+        log.info("Board deleted by platform admin: id={}", boardId);
     }
 
     private boolean isPublicWorkspace(WorkspaceResponse workspace) {

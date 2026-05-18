@@ -6,6 +6,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import com.admin.client.AuthAdminClient;
+import com.admin.client.PlatformAdminClient;
 import com.admin.dto.AdminStatsResponse;
 import com.admin.dto.AdminUserResponse;
 import com.admin.security.AdminGuard;
@@ -18,6 +19,7 @@ import java.util.List;
 public class AdminStatsController {
 
     private final AuthAdminClient authAdminClient;
+    private final PlatformAdminClient platformAdminClient;
     private final AdminGuard adminGuard;
 
     @GetMapping
@@ -28,12 +30,19 @@ public class AdminStatsController {
         adminGuard.requirePlatformAdmin(role);
         
         List<AdminUserResponse> users = authAdminClient.listUsers(authorization);
+        List<Object> workspaces = platformAdminClient.listWorkspaces(authorization);
+        List<Object> boards = platformAdminClient.listBoards(authorization);
+        List<Object> auditLogs = platformAdminClient.listAuditLogs(authorization);
+        long cardsCreated = auditLogs.stream()
+                .filter(log -> String.valueOf(((java.util.Map<?, ?>) log).get("actionType")).equalsIgnoreCase("CREATE"))
+                .count();
         
         AdminStatsResponse stats = new AdminStatsResponse(
                 users.size(),
-                12, // Mocked for now
-                45, // Mocked for now
-                users.stream().filter(AdminUserResponse::isActive).count()
+                workspaces.size(),
+                boards.size(),
+                cardsCreated,
+                workspaces.size()
         );
                 
         return ResponseEntity.ok(stats);

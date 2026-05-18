@@ -26,6 +26,30 @@ public class WorkspaceController {
 
     private final WorkspaceService workspaceService;
 
+    private void requirePlatformAdmin(String role) {
+        if (!"PLATFORM_ADMIN".equalsIgnoreCase(role)) {
+            throw new com.flowboard.workspace.exception.CustomException(
+                    "Platform admin access required",
+                    org.springframework.http.HttpStatus.FORBIDDEN);
+        }
+    }
+
+    @GetMapping("/admin")
+    public ResponseEntity<List<WorkspaceResponse>> getAllForAdmin(
+            @RequestHeader(value = "X-User-Role", required = false) String role) {
+        requirePlatformAdmin(role);
+        return ResponseEntity.ok(workspaceService.getAllWorkspacesForAdmin());
+    }
+
+    @DeleteMapping("/admin/{id}")
+    public ResponseEntity<String> deleteForAdmin(
+            @PathVariable Long id,
+            @RequestHeader(value = "X-User-Role", required = false) String role) {
+        requirePlatformAdmin(role);
+        workspaceService.deleteWorkspaceForAdmin(id);
+        return ResponseEntity.ok("Workspace deleted successfully");
+    }
+
     // Create workspace
     @PostMapping
     public ResponseEntity<WorkspaceResponse> create(

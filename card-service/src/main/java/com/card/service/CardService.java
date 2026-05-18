@@ -51,6 +51,7 @@ public interface CardService {
 
     // Activity
     List<CardActivityResponse> getCardActivity(Long cardId);
+    List<CardActivityResponse> getAllActivityForAdmin();
 
     // Attachments
     CardAttachmentResponse uploadAttachment(Long cardId, MultipartFile file, Long userId);

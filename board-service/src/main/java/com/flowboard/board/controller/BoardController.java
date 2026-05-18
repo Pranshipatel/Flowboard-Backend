@@ -43,6 +43,44 @@ public class BoardController {
         return "PREMIUM".equalsIgnoreCase(plan) && "ACTIVE".equalsIgnoreCase(status);
     }
 
+    private void requirePlatformAdmin(String role) {
+        if (!"PLATFORM_ADMIN".equalsIgnoreCase(role)) {
+            throw new CustomException("Platform admin access required", HttpStatus.FORBIDDEN);
+        }
+    }
+
+    @GetMapping("/admin")
+    public ResponseEntity<List<BoardResponse>> getAllForAdmin(
+            @RequestHeader(value = "X-User-Role", required = false) String role) {
+        requirePlatformAdmin(role);
+        return ResponseEntity.ok(boardService.getAllBoardsForAdmin());
+    }
+
+    @PutMapping("/admin/{id}/close")
+    public ResponseEntity<BoardResponse> closeForAdmin(
+            @PathVariable Long id,
+            @RequestHeader(value = "X-User-Role", required = false) String role) {
+        requirePlatformAdmin(role);
+        return ResponseEntity.ok(boardService.closeBoardForAdmin(id));
+    }
+
+    @PutMapping("/admin/{id}/reopen")
+    public ResponseEntity<BoardResponse> reopenForAdmin(
+            @PathVariable Long id,
+            @RequestHeader(value = "X-User-Role", required = false) String role) {
+        requirePlatformAdmin(role);
+        return ResponseEntity.ok(boardService.reopenBoardForAdmin(id));
+    }
+
+    @DeleteMapping("/admin/{id}")
+    public ResponseEntity<String> deleteForAdmin(
+            @PathVariable Long id,
+            @RequestHeader(value = "X-User-Role", required = false) String role) {
+        requirePlatformAdmin(role);
+        boardService.deleteBoardForAdmin(id);
+        return ResponseEntity.ok("Board removed successfully");
+    }
+
     @PostMapping
     public ResponseEntity<BoardResponse> create(
             @Valid @RequestBody CreateBoardRequest request,

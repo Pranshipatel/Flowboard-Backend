@@ -483,6 +483,14 @@ public class CardServiceImpl implements CardService{
     }
 
     @Override
+    public List<CardActivityResponse> getAllActivityForAdmin() {
+        return activityRepository.findAllByOrderByCreatedAtDesc()
+                .stream()
+                .map(this::toActivityResponse)
+                .toList();
+    }
+
+    @Override
     @Transactional
     public CardAttachmentResponse uploadAttachment(Long cardId, MultipartFile file, Long userId) {
         Card card = findCard(cardId);

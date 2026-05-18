@@ -4,6 +4,8 @@ public class AdminStatsResponse {
     private long totalUsers;
     private long totalWorkspaces;
     private long totalBoards;
+    private long totalCards;
+    private long activeTeams;
     private long activeUsersToday;
 
     public AdminStatsResponse() {
@@ -13,7 +15,17 @@ public class AdminStatsResponse {
         this.totalUsers = totalUsers;
         this.totalWorkspaces = totalWorkspaces;
         this.totalBoards = totalBoards;
+        this.activeTeams = totalWorkspaces;
         this.activeUsersToday = activeUsersToday;
+    }
+
+    public AdminStatsResponse(long totalUsers, long totalWorkspaces, long totalBoards, long totalCards, long activeTeams) {
+        this.totalUsers = totalUsers;
+        this.totalWorkspaces = totalWorkspaces;
+        this.totalBoards = totalBoards;
+        this.totalCards = totalCards;
+        this.activeTeams = activeTeams;
+        this.activeUsersToday = activeTeams;
     }
 
     public long getTotalUsers() {
@@ -38,6 +50,22 @@ public class AdminStatsResponse {
 
     public void setTotalBoards(long totalBoards) {
         this.totalBoards = totalBoards;
+    }
+
+    public long getTotalCards() {
+        return totalCards;
+    }
+
+    public void setTotalCards(long totalCards) {
+        this.totalCards = totalCards;
+    }
+
+    public long getActiveTeams() {
+        return activeTeams;
+    }
+
+    public void setActiveTeams(long activeTeams) {
+        this.activeTeams = activeTeams;
     }
 
     public long getActiveUsersToday() {

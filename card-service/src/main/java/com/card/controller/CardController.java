@@ -47,6 +47,26 @@ public class CardController {
         return "PREMIUM".equalsIgnoreCase(plan) && "ACTIVE".equalsIgnoreCase(status);
     }
 
+    private void requirePlatformAdmin(String role) {
+        if (!"PLATFORM_ADMIN".equalsIgnoreCase(role)) {
+            throw new CustomException("Platform admin access required", HttpStatus.FORBIDDEN);
+        }
+    }
+
+    @GetMapping("/admin/audit-logs")
+    public ResponseEntity<List<CardActivityResponse>> getAuditLogsForAdmin(
+            @RequestHeader(value = "X-User-Role", required = false) String role) {
+        requirePlatformAdmin(role);
+        return ResponseEntity.ok(cardService.getAllActivityForAdmin());
+    }
+
+    @GetMapping("/admin/overdue")
+    public ResponseEntity<List<CardResponse>> getOverdueForAdmin(
+            @RequestHeader(value = "X-User-Role", required = false) String role) {
+        requirePlatformAdmin(role);
+        return ResponseEntity.ok(cardService.getAllOverdueCards());
+    }
+
     @PostMapping
     public ResponseEntity<CardResponse> create(
             @Valid @RequestBody CreateCardRequest request,

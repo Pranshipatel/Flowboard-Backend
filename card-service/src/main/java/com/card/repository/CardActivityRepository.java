@@ -15,4 +15,6 @@ public interface CardActivityRepository extends JpaRepository<CardActivity, Long
 
     List<CardActivity> findTop10ByCardIdOrderByCreatedAtDesc(Long cardId);
 
+    List<CardActivity> findAllByOrderByCreatedAtDesc();
+
 }

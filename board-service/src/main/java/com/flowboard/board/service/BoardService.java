@@ -31,6 +31,7 @@ public interface BoardService {
 
     // Public boards
     List<BoardResponse> getPublicBoards();
+    List<BoardResponse> getAllBoardsForAdmin();
 
     PublicBoardDetailResponse getPublicBoardDetail(Long boardId);
 
@@ -48,6 +49,9 @@ public interface BoardService {
 
     // Delete board
     void deleteBoard(Long boardId, Long requesterId);
+    BoardResponse closeBoardForAdmin(Long boardId);
+    BoardResponse reopenBoardForAdmin(Long boardId);
+    void deleteBoardForAdmin(Long boardId);
 
     // ===== Member management =====
 

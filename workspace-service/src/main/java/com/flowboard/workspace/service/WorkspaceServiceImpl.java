@@ -105,6 +105,12 @@ public class WorkspaceServiceImpl implements WorkspaceService {
                 .stream().map(this::toResponse).toList();
     }
 
+    @Override
+    public List<WorkspaceResponse> getAllWorkspacesForAdmin() {
+        return workspaceRepository.findAll()
+                .stream().map(this::toResponse).toList();
+    }
+
     // Update workspace
     @Override
     @Transactional
@@ -177,6 +183,14 @@ public class WorkspaceServiceImpl implements WorkspaceService {
         } catch (Exception e) {
             log.error("Failed to send workspace deletion notifications", e);
         }
+    }
+
+    @Override
+    @Transactional
+    public void deleteWorkspaceForAdmin(Long workspaceId) {
+        Workspace workspace = findWorkspace(workspaceId);
+        workspaceRepository.delete(workspace);
+        log.info("Workspace deleted by platform admin: id={}", workspaceId);
     }
 
     // Add member
